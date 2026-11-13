@@ -17,6 +17,21 @@ namespace {
 
 constexpr const char* kMasked = "********";
 
+// HTTP Basic Auth gate; disabled while AppConfig::web_ui_pin is empty.
+bool CheckAuth(AsyncWebServerRequest* request) {
+    const config::AppConfig& cfg = config::Store().Get();
+    if (cfg.web_ui_pin[0] == '\0') return true;
+    if (request->authenticate("admin", cfg.web_ui_pin)) return true;
+    request->requestAuthentication();
+    return false;
+}
+
+void SendJson(AsyncWebServerRequest* request, JsonDocument& doc) {
+    String body;
+    serializeJson(doc, body);
+    request->send(200, "application/json", body);
+}
+
 void WriteChargepointJson(JsonObject obj, const openwb::ChargepointStatus& cp) {
     obj["id"] = cp.id;
     obj["name"] = cp.name;
@@ -37,6 +52,7 @@ void WriteChargepointJson(JsonObject obj, const openwb::ChargepointStatus& cp) {
 }
 
 void HandleGetStatus(AsyncWebServerRequest* request) {
+    if (!CheckAuth(request)) return;
     const config::AppConfig& cfg = config::Store().Get();
 
     JsonDocument doc;
@@ -54,16 +70,16 @@ void HandleGetStatus(AsyncWebServerRequest* request) {
     g["battery_soc_percent"] = global.battery_soc_percent;
     g["consumer_power_w"] = global.consumer_power_w;
 
-    String body;
-    serializeJson(doc, body);
-    request->send(200, "application/json", body);
+    SendJson(request, doc);
 }
 
 void HandleGetConfig(AsyncWebServerRequest* request) {
+    if (!CheckAuth(request)) return;
     const config::AppConfig& cfg = config::Store().Get();
 
     JsonDocument doc;
     doc["device_name"] = cfg.device_name;
+    doc["has_web_ui_pin"] = cfg.web_ui_pin[0] != '\0';
     doc["mqtt_host"] = cfg.mqtt_host;
     doc["mqtt_port"] = cfg.mqtt_port;
     doc["mqtt_username"] = cfg.mqtt_username;
@@ -81,12 +97,11 @@ void HandleGetConfig(AsyncWebServerRequest* request) {
     doc["ota_auto_check"] = cfg.ota_auto_check;
     doc["ota_manifest_url"] = cfg.ota_manifest_url;
 
-    String body;
-    serializeJson(doc, body);
-    request->send(200, "application/json", body);
+    SendJson(request, doc);
 }
 
-void HandlePostConfig(AsyncWebServerRequest* /*request*/, JsonVariant& json) {
+bool HandlePostConfig(AsyncWebServerRequest* request, JsonVariant& json) {
+    if (!CheckAuth(request)) return false;
     JsonObject body = json.as<JsonObject>();
 
     config::Store().Update([&](config::AppConfig& c) {
@@ -95,9 +110,7 @@ void HandlePostConfig(AsyncWebServerRequest* /*request*/, JsonVariant& json) {
         if (body["mqtt_port"].is<int>()) c.mqtt_port = body["mqtt_port"];
         if (body["mqtt_username"].is<const char*>())
             strlcpy(c.mqtt_username, body["mqtt_username"], sizeof(c.mqtt_username));
-        // Only overwrite a secret if a real (non-masked, non-empty) value was sent —
-        // the GET handler never echoes the real secret back, so the web UI's "leave
-        // unchanged" affordance is simply "don't include this field in the PATCH body".
+        // Empty/absent = leave unchanged; the GET side never echoes the real secret.
         if (body["mqtt_password"].is<const char*>() && strlen(body["mqtt_password"]) > 0)
             strlcpy(c.mqtt_password, body["mqtt_password"], sizeof(c.mqtt_password));
         if (body["mqtt_use_tls"].is<bool>()) c.mqtt_use_tls = body["mqtt_use_tls"];
@@ -117,24 +130,33 @@ void HandlePostConfig(AsyncWebServerRequest* /*request*/, JsonVariant& json) {
         }
     });
 
-    // Applies live rather than only on next boot — there's no on-device brightness
-    // slider anymore to do this (settings are web-UI-only; see ui/wifi_reset_prompt.h),
-    // so this is the only place a brightness change actually takes effect.
     if (body["brightness_pct"].is<int>()) {
         board::SetBacklight(static_cast<uint8_t>(static_cast<int>(body["brightness_pct"])));
     }
-    // Note: this handler doesn't send a response itself — AsyncCallbackJsonWebHandler's
-    // onRequest below sends it after this body callback runs.
+    // Caller sends the response; CheckAuth() already did on failure.
+    return true;
+}
+
+// Separate from /api/config since an empty value here means "clear the PIN", unlike
+// /api/config's "empty means leave unchanged" for mqtt_password.
+bool HandleSetWebUiPin(AsyncWebServerRequest* request, JsonVariant& json) {
+    if (!CheckAuth(request)) return false;
+    JsonObject body = json.as<JsonObject>();
+    const char* new_pin = body["pin"] | "";
+    config::Store().Update(
+        [&](config::AppConfig& c) { strlcpy(c.web_ui_pin, new_pin, sizeof(c.web_ui_pin)); });
+    return true;
 }
 
 void HandleWifiReset(AsyncWebServerRequest* request) {
-    // Responds before actually resetting — ResetAndReprovision() reboots the device, so
-    // there'd be no connection left to send a response over afterward.
+    if (!CheckAuth(request)) return;
+    // Must respond before ResetAndReprovision(), which reboots the device.
     request->send(200, "application/json", "{\"success\":true}");
     net::ResetAndReprovision();
 }
 
 void HandleGetInfo(AsyncWebServerRequest* request) {
+    if (!CheckAuth(request)) return;
     JsonDocument doc;
     doc["project_name"] = PROJECT_NAME;
     doc["firmware_version"] = FW_VERSION;
@@ -142,12 +164,11 @@ void HandleGetInfo(AsyncWebServerRequest* request) {
     doc["free_heap"] = ESP.getFreeHeap();
     doc["chip_model"] = ESP.getChipModel();
 
-    String body;
-    serializeJson(doc, body);
-    request->send(200, "application/json", body);
+    SendJson(request, doc);
 }
 
 void HandleOtaCheck(AsyncWebServerRequest* request) {
+    if (!CheckAuth(request)) return;
     ota::UpdateCheckResult result = ota::CheckForUpdate(/*auto_triggered=*/false);
 
     JsonDocument doc;
@@ -157,12 +178,11 @@ void HandleOtaCheck(AsyncWebServerRequest* request) {
     doc["latest_version"] = result.latest_version;
     doc["message"] = result.message;
 
-    String body;
-    serializeJson(doc, body);
-    request->send(200, "application/json", body);
+    SendJson(request, doc);
 }
 
 void HandleOtaStart(AsyncWebServerRequest* request) {
+    if (!CheckAuth(request)) return;
     bool force = request->hasParam("force", true) && request->getParam("force", true)->value() == "1";
     ota::InstallResult result = ota::StartInstall(force);
 
@@ -170,18 +190,15 @@ void HandleOtaStart(AsyncWebServerRequest* request) {
     doc["started"] = result.started;
     doc["reason"] = result.reason;
 
-    String body;
-    serializeJson(doc, body);
-    request->send(200, "application/json", body);
+    SendJson(request, doc);
 }
 
 void HandleOtaProgress(AsyncWebServerRequest* request) {
+    if (!CheckAuth(request)) return;
     JsonDocument doc;
     doc["progress_percent"] = ota::InstallProgressPercent();
 
-    String body;
-    serializeJson(doc, body);
-    request->send(200, "application/json", body);
+    SendJson(request, doc);
 }
 
 } // namespace
@@ -198,10 +215,16 @@ void RegisterApiRoutes(AsyncWebServer& server) {
     auto* config_post_handler = new AsyncCallbackJsonWebHandler(
         "/api/config",
         [](AsyncWebServerRequest* request, JsonVariant json) {
-            HandlePostConfig(request, json);
-            request->send(200, "application/json", "{\"success\":true}");
+            if (HandlePostConfig(request, json)) request->send(200, "application/json", "{\"success\":true}");
         });
     server.addHandler(config_post_handler);
+
+    auto* pin_post_handler = new AsyncCallbackJsonWebHandler(
+        "/api/webui/pin",
+        [](AsyncWebServerRequest* request, JsonVariant json) {
+            if (HandleSetWebUiPin(request, json)) request->send(200, "application/json", "{\"success\":true}");
+        });
+    server.addHandler(pin_post_handler);
 }
 
 } // namespace web

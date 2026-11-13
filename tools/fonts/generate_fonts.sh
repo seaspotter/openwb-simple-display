@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Generates LVGL font C files from the OFL sans-serif font in tools/fonts/source/ at the
-# sizes this project's screens actually use (plan §6). Requires Node and lv_font_conv
-# (https://github.com/lvgl/lv_font_conv): `npm install -g lv_font_conv`.
+# Generates LVGL font C files from tools/fonts/source/. Requires lv_font_conv:
+# `npm install -g lv_font_conv`.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,17 +22,8 @@ fi
 
 mkdir -p "${OUT_DIR}"
 
-# Sizes used by the UI (plan §6): 11px small legends/labels (matches quartz's own
-# `.badge` CSS: font-size 11px, confirmed against the live theme), 14px labels,
-# 20px values, 32px hero numbers.
-# Range covers Basic Latin (0x20-0x7F) plus Latin-1 Supplement (0xA0-0xFF), the latter
-# needed for German UI text (ä/ö/ü/Ä/Ö/Ü/ß) — the UI is German, not just ASCII.
-# --no-compress: lv_font_conv's default RLE-compressed bitmap format
-# (bitmap_format=1) rendered as all-tofu against the pinned lvgl@9.2.2 — confirmed by
-# comparing against LVGL's own built-in fonts, which all ship uncompressed
-# (bitmap_format=0) and render correctly. Possible version drift between
-# lv_font_conv@1.5.3's RLE scheme and this LVGL release's decoder; plain bitmaps sidestep
-# it entirely and cost only a modest flash-size increase for this project's small glyph set.
+# Range: Basic Latin + Latin-1 Supplement, for German umlauts/ß.
+# --no-compress: lv_font_conv's default RLE bitmap format renders as tofu on lvgl@9.2.2.
 for size in 11 14 20 32; do
   lv_font_conv \
     --font "${SOURCE_FONT}" \
@@ -46,10 +36,7 @@ for size in 11 14 20 32; do
   echo "generated font_sans_${size}.c"
 done
 
-# Bold weight, 14px only so far — used where a label needs to stand out (e.g. the
-# chargepoint name) without bumping its size. Add more sizes here if a future screen
-# needs them; LVGL has no synthetic/faux-bold, so an actual bold-weight font file is the
-# only way to get this, not a style property.
+# LVGL has no synthetic bold — a real bold-weight font file, size 14 only so far.
 lv_font_conv \
   --font "${SOURCE_FONT_BOLD}" \
   --size 14 \

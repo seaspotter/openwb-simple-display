@@ -5,12 +5,8 @@
 namespace widgets {
 namespace {
 
-// Scaled to a max of 24, not 100: an extreme flex_grow ratio (e.g. 100:1, which a
-// near-zero segment next to a dominant one produces) reproducibly left the *whole bar*
-// short of the container's right edge against the pinned lvgl@9.2.2 — confirmed by
-// pixel-measuring a rendered screenshot, not a guess. A moderate max ratio (24:1) keeps
-// visible proportionality while staying inside whatever range this flex_grow
-// implementation handles cleanly.
+// Capped at 24, not 100: an extreme flex_grow ratio (e.g. 100:1) leaves the whole bar
+// short of the container's right edge on this LVGL version.
 uint8_t WeightFor(float magnitude, float total) {
     if (total < 1.0f) return 1;
     uint8_t weight = static_cast<uint8_t>(std::lround((magnitude / total) * 24.0f));
@@ -36,14 +32,10 @@ lv_obj_t* CreateFlowBar(lv_obj_t* parent, const lv_color_t* colors, uint8_t coun
     lv_obj_t* bar = lv_obj_create(parent);
     lv_obj_set_flex_flow(bar, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_all(bar, 0, LV_PART_MAIN);
-    // pad_all doesn't cover the gap *between* flex children — that's pad_column
-    // specifically, and without zeroing it too, the default theme's flex gap left
-    // visible gaps between segments that looked like background showing through.
-    lv_obj_set_style_pad_column(bar, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_column(bar, 0, LV_PART_MAIN); // pad_all doesn't cover this gap
     lv_obj_set_style_border_width(bar, 0, LV_PART_MAIN);
     lv_obj_set_style_radius(bar, LV_RADIUS_CIRCLE, LV_PART_MAIN);
-    lv_obj_set_style_clip_corner(bar, true, LV_PART_MAIN); // segments stay inside the
-                                                             // pill-rounded ends
+    lv_obj_set_style_clip_corner(bar, true, LV_PART_MAIN);
     lv_obj_set_size(bar, lv_pct(100), 8);
     lv_obj_remove_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
 

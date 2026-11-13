@@ -1,6 +1,4 @@
-// esp_lcd RGB/DPI panel bring-up for the ST7701S 480x480 panel, plus the LVGL display
-// registration that sits on top of it. See plan M1: this is the highest hardware-risk
-// module and must be validated on real hardware for tearing/glitches before anything else.
+// ST7701S 480x480 panel bring-up and LVGL display registration.
 #pragma once
 
 #include <lvgl.h>

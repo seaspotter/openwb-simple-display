@@ -1,5 +1,4 @@
-// SNTP time sync, needed for TLS certificate validation during OTA (plan §9) — a
-// cert's validity window can't be checked without a roughly-correct system clock.
+// SNTP time sync — also needed for TLS certificate validity checks during OTA.
 #pragma once
 
 namespace net {

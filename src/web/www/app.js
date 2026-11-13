@@ -1,11 +1,16 @@
-// Minimal vanilla-JS settings UI — intentionally no build step/framework, this is a
-// handful of forms talking to /api/* (api_routes.cpp), not an app that benefits from one.
-
 function showToast(message) {
   const toast = document.getElementById("toast");
   toast.textContent = message;
   toast.classList.add("visible");
   setTimeout(() => toast.classList.remove("visible"), 2500);
+}
+
+function postJson(url, body) {
+  return fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 async function loadConfig() {
@@ -21,6 +26,7 @@ async function loadConfig() {
   document.getElementById("screen_timeout_s").value = cfg.screen_timeout_s;
   document.getElementById("dark_mode").value = String(cfg.dark_mode);
   document.documentElement.setAttribute("data-theme", cfg.dark_mode ? "dark" : "light");
+  document.getElementById("pin-status").textContent = cfg.has_web_ui_pin ? "Aktiv" : "Deaktiviert";
 }
 
 async function loadStatus() {
@@ -67,11 +73,7 @@ async function saveSettings() {
   const password = document.getElementById("mqtt_password").value;
   if (password) body.mqtt_password = password;
 
-  const res = await fetch("/api/config", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const res = await postJson("/api/config", body);
   showToast(res.ok ? "Gespeichert." : "Einstellungen konnten nicht gespeichert werden.");
   document.documentElement.setAttribute("data-theme", body.dark_mode ? "dark" : "light");
 }
@@ -119,13 +121,20 @@ async function installUpdate() {
   }
 }
 
+async function setWebUiPin() {
+  const pin = document.getElementById("web_ui_pin").value;
+  const res = await postJson("/api/webui/pin", { pin });
+  showToast(res.ok ? (pin ? "PIN gesetzt." : "PIN entfernt.") : "Fehlgeschlagen — falscher aktueller PIN?");
+  document.getElementById("web_ui_pin").value = "";
+  loadConfig();
+}
+
 async function resetWifi() {
   if (!confirm("WLAN wirklich zurücksetzen? Das Display startet danach im Einrichtungsmodus neu.")) return;
   try {
     await fetch("/api/wifi/reset", { method: "POST" });
   } catch (e) {
-    // The device reboots right after responding, so the connection dropping here is
-    // expected, not a real failure.
+    // Expected: the device reboots right after responding.
   }
   showToast("WLAN wird zurückgesetzt — Display startet neu.");
 }
@@ -134,6 +143,7 @@ document.getElementById("save-btn").addEventListener("click", saveSettings);
 document.getElementById("check-update-btn").addEventListener("click", checkForUpdate);
 document.getElementById("install-update-btn").addEventListener("click", installUpdate);
 document.getElementById("reset-wifi-btn").addEventListener("click", resetWifi);
+document.getElementById("set-pin-btn").addEventListener("click", setWebUiPin);
 
 loadConfig();
 loadStatus();

@@ -6,7 +6,7 @@
 
 namespace ota {
 namespace {
-constexpr uint32_t kIdleThresholdMs = 5 * 60 * 1000; // 5 minutes, plan §9
+constexpr uint32_t kIdleThresholdMs = 5 * 60 * 1000;
 } // namespace
 
 bool ShouldAttemptAutomaticInstall() {

@@ -61,6 +61,19 @@
       möglich — nützlich falls diese Weboberfläche nicht mehr erreichbar ist.</p>
     <button class="secondary" id="reset-wifi-btn">WLAN zurücksetzen</button>
   </section>
+
+  <section class="panel">
+    <h2>Sicherheit</h2>
+    <p>Ohne PIN ist diese Weboberfläche für jeden im selben WLAN ohne Anmeldung
+      erreichbar. Optional einen PIN setzen, um Einstellungen, Firmware-Updates und
+      WLAN-Reset zu schützen.</p>
+    <div class="status-row"><span>PIN-Schutz</span><span class="value" id="pin-status">-</span></div>
+    <label for="web_ui_pin">Neuer PIN (leer lassen und speichern, um ihn zu entfernen)</label>
+    <input id="web_ui_pin" type="password" placeholder="PIN" />
+    <button class="secondary" id="set-pin-btn">PIN speichern</button>
+    <p><small>PIN vergessen? Es gibt keinen Reset dafür außer einem erneuten Flashen mit
+      aktivierter Option "Erase device".</small></p>
+  </section>
 </main>
 <div id="toast"></div>
 <script src="app.js"></script>

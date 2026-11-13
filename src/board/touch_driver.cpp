@@ -1,15 +1,17 @@
 #include "touch_driver.h"
 
+#include <Arduino.h>
 #include <lvgl.h>
+
+#include "state/app_state.h"
 
 namespace board {
 namespace {
 
-volatile uint32_t g_last_touch_ms = 0;
 bool g_touch_event_hooked = false;
 
 void OnIndevEvent(lv_event_t* /*e*/) {
-    g_last_touch_ms = lv_tick_get();
+    state::State().NoteTouch(millis());
 }
 
 void EnsureTouchEventHooked() {
@@ -37,15 +39,8 @@ void SetTouchRotation(uint16_t rotation_degrees) {
         case 270: rotation = LV_DISPLAY_ROTATION_270; break;
         default: rotation = LV_DISPLAY_ROTATION_0; break;
     }
-    // esp32-smartdisplay's registered touch input device reads coordinates relative to
-    // this same lv_display_t, so rotating the display also rotates touch mapping.
     lv_display_set_rotation(disp, rotation);
-
     EnsureTouchEventHooked();
-}
-
-uint32_t LastTouchMillis() {
-    return g_last_touch_ms;
 }
 
 } // namespace board

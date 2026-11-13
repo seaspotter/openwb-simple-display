@@ -1,16 +1,7 @@
-"""PlatformIO pre-build step: removes LVGL's ARM-only NEON/Helium assembly blend
-backends from the installed dependency copy.
-
-The `lvgl/lvgl` PlatformIO registry package declares no `srcFilter` in its
-library.json, so PlatformIO's LDF compiles its entire src/ tree unconditionally,
-including these two assembly files that are irrelevant on this ESP32-S3 (Xtensa)
-target. Assembling them fails here specifically because the assembler's preprocessing
-include path doesn't carry the ESP-IDF sdkconfig.h/esp_attr.h paths that normal C/C++
-translation units get, which lv_conf_kconfig.h's `#ifdef ESP_PLATFORM` branch requires.
-
-Touches only the disposable `.pio/libdeps` cache (gitignored, rebuilt per machine), not
-the project's own source — safe to run on every build; a no-op once the files are gone.
-"""
+"""PlatformIO pre-build step: deletes LVGL's ARM-only NEON/Helium blend assembly files
+from the installed dependency, since the LDF compiles them unconditionally and they
+fail to assemble on this ESP32-S3 (Xtensa) target. Only touches the gitignored
+.pio/libdeps cache; a no-op once the files are gone."""
 
 from pathlib import Path
 

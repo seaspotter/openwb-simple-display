@@ -1,17 +1,6 @@
-// Reference pin map for the Guition ESP32-4848S040C (ESP32-S3, 480x480 ST7701S RGB/DPI
-// panel, GT911 capacitive touch over I2C).
-//
-// NOT consumed by display_driver.cpp/touch_driver.cpp directly: board bring-up uses the
-// rzeldent/esp32-smartdisplay library, which gets this same pin map from the PlatformIO
-// board definition (board id `esp32-4848S040CIY1`, see boards/ and platformio.ini) rather
-// than from this file. This header exists purely as human-readable documentation of what
-// that board definition encodes, kept here for anyone debugging at the hardware level.
-//
-// Confirmed directly against the vendored board definition at
-// boards/esp32-4848S040CIY1.json (added as a git submodule from
-// rzeldent/platformio-espressif32-sunton — see platformio.ini), and cross-checked
-// against tobymarks/evcc-garage-display's src/board.h (same physical board, different
-// project), which agrees on every value below.
+// Reference pin map for the Guition ESP32-4848S040C. Not consumed directly by code —
+// esp32-smartdisplay gets these from the PlatformIO board definition instead
+// (boards/esp32-4848S040CIY1.json); this is documentation for hardware-level debugging.
 #pragma once
 
 #include <cstdint>
@@ -54,12 +43,9 @@ inline constexpr int kTouchIntPin = -1; // GT911_TOUCH_CONFIG_INT=GPIO_NUM_NC, c
 inline constexpr int kTouchRstPin = -1; // GT911_TOUCH_CONFIG_RST=GPIO_NUM_NC, confirmed
 
 // --- Gotchas ---
-// GPIO0 doubles as R4 and the BOOT strapping pin: must not be pulled low at reset.
-// GPIO3/45/46 are ESP32-S3 strapping pins (G2, touch SCL, G3): pull state at reset matters.
-// GPIO19/20 are the native-USB D-/D+ pins, reused here for touch SDA / LCD G1 — native USB
-// CDC must stay disabled (sdkconfig.defaults: CONFIG_ARDUINO_USB_CDC_ON_BOOT=n).
-// The board JSON also defines BOARD_HAS_LED/LED_GPIO=16 — this is a real conflict with
-// HSYNC (also GPIO16), confirmed in the vendored JSON itself, not just a suspected
-// copy-paste error. Don't use GPIO16 for anything but HSYNC on this board.
+// GPIO0 (R4) is also the BOOT strapping pin. GPIO3/45/46 are strapping pins too.
+// GPIO19/20 are native-USB D-/D+, reused for touch SDA / LCD G1 — USB CDC must stay
+// disabled (sdkconfig.defaults: CONFIG_ARDUINO_USB_CDC_ON_BOOT=n).
+// GPIO16 is HSYNC; the board JSON's LED_GPIO=16 conflicts with it — don't reuse GPIO16.
 
 } // namespace board

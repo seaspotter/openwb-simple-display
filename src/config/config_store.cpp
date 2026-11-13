@@ -39,10 +39,7 @@ void ConfigStore::Load() {
 }
 
 void ConfigStore::Migrate(AppConfig& loaded_config, uint8_t from_version) {
-    // No prior schema versions exist yet (kCurrentSchemaVersion == 1). When a future
-    // version adds/removes/retypes a field, add a `case N:` here that adjusts
-    // `loaded_config` in place before falling through to the next version, rather than
-    // discarding the user's settings on every firmware update.
+    // No prior schema versions exist yet; add a `case N:` here when one does.
     util::LogWarn(kTag, "unknown config schema version, resetting to defaults");
     (void)from_version;
     loaded_config = DefaultConfig();

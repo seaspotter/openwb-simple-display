@@ -1,23 +1,12 @@
 # ESP-IDF sdkconfig overrides for the Guition ESP32-4848S040C (ESP32-S3, ST7701S RGB panel).
+# Addresses known esp_lcd RGB/DPI tearing/glitch issues under PSRAM/flash/WiFi contention.
 #
-# These address known tearing/glitch issues with the esp_lcd RGB/DPI panel driver under
-# PSRAM/flash/WiFi contention — see evcc-garage-display's README for the same set of flags
-# used on this same board family; applied here independently as standard esp_lcd RGB-panel
-# stability practice, not copied code.
-#
-# CONFIRMED INERT with the current build setup (`platform = espressif32@6.11.0`,
-# `framework = arduino` using the prebuilt framework-arduinoespressif32 package — not an
-# ESP-IDF-component build): a verbose build (`pio run -v`) shows no reference to
-# sdkconfig.defaults at all, because the Arduino core ships as prebuilt static libraries
-# Espressif already compiled with their own sdkconfig choices; a plain-Arduino PlatformIO
-# project never runs the Kconfig/menuconfig step that would consume this file. Getting
-# these flags to actually apply would need the "Arduino as an ESP-IDF component" build
-# flow (e.g. via the pioarduino platform fork, or `framework = arduino, espidf`), which
-# is a bigger change not attempted here. In practice esp32-smartdisplay appears to
-# manage RGB-panel stability internally (it's widely used on this exact board via plain
-# Arduino), so this is lower-risk than it sounds — but if tearing shows up during M1
-# hardware bring-up, this inertness is the first thing to revisit, not these flags'
-# values.
+# CONFIRMED INERT with the current build (`framework = arduino`, prebuilt
+# framework-arduinoespressif32, not an ESP-IDF-component build): `pio run -v` shows this
+# file is never consumed, since the Arduino core ships as static libraries already built
+# with Espressif's own sdkconfig. Making these flags apply would need the "Arduino as an
+# ESP-IDF component" build flow instead. If tearing shows up during hardware bring-up,
+# this inertness is the first thing to revisit, not these flags' values.
 
 # Avoid XIP-from-flash stalls corrupting RGB panel timing while PSRAM is used for the
 # framebuffer.

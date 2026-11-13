@@ -1,6 +1,4 @@
-// Light/dark palettes, taken directly from the quartz web theme (plan §6) so screen and
-// widget code never hardcodes a hex value — reference `theme::Colors(dark_mode).accent`
-// etc. instead, making a future re-theme a one-file change.
+// Light/dark palettes, matching the quartz web theme.
 #pragma once
 
 #include <lvgl.h>
@@ -26,9 +24,7 @@ struct Palette {
     lv_color_t consumer; // "Verbraucher" — other household consumers
 };
 
-// lv_color_make() is a plain inline C function, not a C++ constexpr one, so these
-// palettes are runtime-initialized `const` globals rather than `constexpr` — still
-// computed once at static-init time, just not usable in a constant-expression context.
+// lv_color_make() isn't constexpr, so these are runtime-initialized const globals.
 inline const Palette kLightPalette = {
     .bg = lv_color_make(0xf1, 0xf2, 0xf4),
     .panel = lv_color_make(0xff, 0xff, 0xff),
@@ -43,9 +39,7 @@ inline const Palette kLightPalette = {
     .chargepoint = lv_color_make(0x25, 0x63, 0xeb),
     .battery = lv_color_make(0xea, 0xb3, 0x08),
     .car = lv_color_make(0x0d, 0x94, 0x88),
-    .consumer = lv_color_make(0x7c, 0x3a, 0xed), // confirmed exact match to quartz's own
-                                                   // `--consumer` CSS custom property,
-                                                   // pulled directly from its live bundle
+    .consumer = lv_color_make(0x7c, 0x3a, 0xed),
 };
 
 inline const Palette kDarkPalette = {
@@ -62,16 +56,13 @@ inline const Palette kDarkPalette = {
     .chargepoint = lv_color_make(0x5b, 0x9b, 0xff),
     .battery = lv_color_make(0xfa, 0xcc, 0x15),
     .car = lv_color_make(0x2d, 0xd4, 0xbf),
-    .consumer = lv_color_make(0xa7, 0x8b, 0xfa), // confirmed exact match to quartz's dark-
-                                                   // mode `--consumer` value
+    .consumer = lv_color_make(0xa7, 0x8b, 0xfa),
 };
 
 inline const Palette& Colors(bool dark_mode) {
     return dark_mode ? kDarkPalette : kLightPalette;
 }
 
-// Flat-design constants shared by every widget style (plan §6): 8-14px radii, ~zero
-// shadow, rather than per-widget magic numbers.
 inline constexpr lv_coord_t kRadiusSmall = 8;
 inline constexpr lv_coord_t kRadiusLarge = 14;
 

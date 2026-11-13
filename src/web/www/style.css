@@ -1,5 +1,4 @@
-/* Palette matches theme_colors.h / theme_quartz.cpp exactly — keep both in sync if the
-   quartz theme is ever retuned. */
+/* Keep in sync with theme_colors.h / theme_quartz.cpp. */
 :root {
     --bg: #f1f2f4;
     --panel: #ffffff;

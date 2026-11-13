@@ -1,12 +1,12 @@
 #include "net_task.h"
 
 #include <Arduino.h>
-#include <WiFi.h>
 
 #include "config/config_store.h"
 #include "ota/ota_gate.h"
 #include "ota/ota_manager.h"
 #include "openwb/openwb_mqtt.h"
+#include "state/app_state.h"
 #include "time_sync.h"
 #include "web/web_server.h"
 #include "wifi_manager.h"
@@ -18,10 +18,7 @@ QueueHandle_t g_command_queue = nullptr;
 QueueHandle_t g_result_queue = nullptr;
 TaskHandle_t g_task_handle = nullptr;
 
-// MQTT writes are fire-and-forget (plan §5) — no per-command success/message envelope
-// like the retired HTTP client had. The one failure this can actually detect locally is
-// "not connected to the broker at all", which is still worth surfacing as a toast rather
-// than silently dropping the touch action.
+// MQTT writes are fire-and-forget; the only failure detectable here is no broker connection.
 state::CommandResult ExecuteCommand(const CommandRequest& req) {
     state::CommandResult result;
     result.chargepoint_id = req.chargepoint_id;
@@ -48,8 +45,7 @@ state::CommandResult ExecuteCommand(const CommandRequest& req) {
 }
 
 void NetTask(void* /*param*/) {
-    net::Provision(); // blocks here on first boot until the captive portal is completed;
-                       // returns promptly on subsequent boots once WiFi connects.
+    net::Provision(); // blocks until provisioned on first boot
 
     time_sync::Init();
     web::InitServer();
@@ -62,13 +58,12 @@ void NetTask(void* /*param*/) {
         const config::AppConfig& cfg = config::Store().Get();
         uint32_t now = millis();
 
-        openwb::mqtt::Loop(); // non-blocking; pumps socket I/O and handles reconnect —
-                               // push-based, so there's no poll interval to gate on here
-                               // the way the retired HTTP poller needed.
+        openwb::mqtt::Loop();
 
-        // First successful MQTT connection confirms this boot is healthy — cancels the
-        // bootloader's pending-rollback state (plan §8) so an OTA update isn't
-        // automatically reverted on the next unrelated crash/reboot.
+        // The UI task can't call openwb::mqtt::IsConnected() directly (ESP-only).
+        state::State().SetMqttConnected(openwb::mqtt::IsConnected());
+
+        // Confirms the boot is healthy, cancelling the bootloader's pending rollback.
         if (!app_marked_valid && openwb::mqtt::IsConnected()) {
             ota::MarkAppValidAfterSuccessfulBoot();
             app_marked_valid = true;
@@ -97,7 +92,6 @@ void Init() {
     g_command_queue = xQueueCreate(8, sizeof(CommandRequest));
     g_result_queue = xQueueCreate(8, sizeof(state::CommandResult));
 
-    // Core 0, leaving core 1 dedicated to LVGL (plan §5).
     xTaskCreatePinnedToCore(NetTask, "net", 8192, nullptr, 1, &g_task_handle, 0);
 }
 

@@ -11,13 +11,8 @@ namespace {
 
 constexpr const char* kButtonMap[] = {"Sofort", "PV", "Ziel", "Eco", "Stopp", ""};
 
-lv_style_t g_item_default_style; // unselected: no chrome at all, just text — matches
-                                  // quartz's segmented-control look (confirmed against
-                                  // the live theme: unselected options are plain text,
-                                  // only the active one gets a filled pill)
-lv_style_t g_item_checked_style; // selected: full pill radius; bg/text color come from
-                                  // the base theme's own checked-state styling
-                                  // (accent-colored), left untouched here
+lv_style_t g_item_default_style; // unselected: plain text, no chrome
+lv_style_t g_item_checked_style; // selected: full pill radius
 
 openwb::ChargeMode ModeForButtonIndex(uint32_t index) {
     switch (index) {
@@ -78,22 +73,15 @@ lv_obj_t* CreateModeSwitch(lv_obj_t* parent, uint8_t chargepoint_id) {
     const theme::Palette& colors = theme::Colors(config::Store().Get().dark_mode);
 
     lv_obj_t* matrix = lv_buttonmatrix_create(parent);
-    // Explicit, compact height: left unset, lv_buttonmatrix defaults to a much taller
-    // box than its content needs, which made the selected item's pill (LV_RADIUS_CIRCLE
-    // rounds to half of whichever is smaller of the button's width/height) balloon into
-    // an oversized capsule instead of a tight oval hugging the text — confirmed against
-    // a live screenshot, not a guess this time.
+    // Explicit height: lv_buttonmatrix's default is much taller than its content,
+    // which balloons the selected pill (LV_RADIUS_CIRCLE rounds to half the smaller
+    // dimension) into an oversized capsule.
     lv_obj_set_size(matrix, lv_pct(100), 36);
-    // Light "track" the pill slides within, matching the reference screenshot — the
-    // page bg color reads as a visibly distinct track against the white card behind it.
     lv_obj_set_style_bg_opa(matrix, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_bg_color(matrix, colors.bg, LV_PART_MAIN);
     lv_obj_set_style_radius(matrix, LV_RADIUS_CIRCLE, LV_PART_MAIN);
     lv_obj_set_style_border_width(matrix, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(matrix, 3, LV_PART_MAIN);
-    // Quartz's segmented control: unselected options are plain text with zero button
-    // chrome; only the selected one gets a filled, fully-rounded pill (confirmed
-    // against the live theme's CSS and a screenshot) — not "every option is a button."
     lv_obj_add_style(matrix, &g_item_default_style, LV_PART_ITEMS);
     lv_obj_add_style(matrix, &g_item_checked_style, LV_PART_ITEMS | LV_STATE_CHECKED);
     lv_buttonmatrix_set_map(matrix, kButtonMap);

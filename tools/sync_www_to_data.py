@@ -1,9 +1,5 @@
 """PlatformIO pre-build step: mirrors src/web/www/ into data/ before the LittleFS image
-is built, so the web UI's HTML/CSS/JS has exactly one source of truth (src/web/www/)
-instead of two copies that can drift (plan §2's "data/ vs src/web/www/" note).
-
-Registered via platformio.ini's `extra_scripts = pre:tools/sync_www_to_data.py`.
-"""
+is built, so there's one source of truth for the web UI's assets."""
 
 import shutil
 from pathlib import Path

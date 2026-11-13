@@ -8,6 +8,7 @@
 #include "ui/theme/theme_colors.h"
 #include "ui/theme/theme_quartz.h"
 #include "ui/ui_events.h"
+#include "ui/widgets/layout_helpers.h"
 #include "ui/widgets/mode_switch.h"
 
 namespace screens {
@@ -20,27 +21,17 @@ constexpr float kCurrentMaxAmps = 32.0f;
 struct ChargepointCardWidgets {
     uint8_t chargepoint_id;
 
-    // Header row: name (left), lock + state badge (right) — row order and the badge's
-    // move next to the lock button both confirmed against the live quartz chargepoint
-    // card's own layout, not guessed (plan §6).
     lv_obj_t* name_label;
-    lv_obj_t* lock_button;
     lv_obj_t* lock_icon_label;
     lv_obj_t* state_label;
-
-    // openWB's own state_str message, shown verbatim in a tinted box — distinct from the
-    // short badge above, which this project derives locally from plugged/charging.
     lv_obj_t* status_box_label;
-
     lv_obj_t* vehicle_name_label;
     lv_obj_t* soc_label;
 
     lv_obj_t* mode_switch;
-    lv_obj_t* stepper_row; // only shown in Sofort/instant mode — see
-                            // ChargeModeHasManualCurrent()
+    lv_obj_t* stepper_row; // only shown in Sofort/instant mode
     lv_obj_t* current_value_label;
 
-    // Read-only stats row: Leistung (+ phases badge), Strom, Geladen.
     lv_obj_t* stat_power_label;
     lv_obj_t* stat_phases_label;
     lv_obj_t* stat_current_label;
@@ -67,45 +58,16 @@ void OnCurrentStep(lv_event_t* e) {
     ui::RequestChargecurrentDebounced(widgets->chargepoint_id, widgets->current_amps);
 }
 
-// Mirrors quartz's `.badge`/`.badge-wait`/`.badge-muted` pattern (confirmed against the
-// live theme's CSS: full pill radius, ~18% tinted bg, colored text) rather than a big
-// solid-color block — a state indicator should read as a small pill, not a headline.
+// Pill badge matching quartz's .badge style.
 void ApplyBadgeStyle(lv_obj_t* label, lv_color_t color, bool tinted) {
     lv_obj_set_style_radius(label, LV_RADIUS_CIRCLE, LV_PART_MAIN);
     lv_obj_set_style_pad_hor(label, 10, LV_PART_MAIN);
     lv_obj_set_style_pad_ver(label, 4, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(label, tinted ? static_cast<lv_opa_t>(46) : LV_OPA_COVER,
-                             LV_PART_MAIN); // 46/255 ~= 18%, matching quartz's .badge tint
+    lv_obj_set_style_bg_opa(label, tinted ? static_cast<lv_opa_t>(46) : LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_bg_color(label, tinted ? color : theme::Colors(config::Store().Get().dark_mode).bg,
                                LV_PART_MAIN);
     lv_obj_set_style_text_color(label, tinted ? color : theme::Colors(config::Store().Get().dark_mode).muted,
                                  LV_PART_MAIN);
-}
-
-lv_obj_t* CreateIconLabel(lv_obj_t* parent, icon::Glyph glyph, lv_color_t color) {
-    char utf8[4];
-    icon::Utf8Encode(glyph, utf8);
-    lv_obj_t* label = lv_label_create(parent);
-    lv_label_set_text(label, utf8);
-    lv_obj_set_style_text_font(label, &font_icons_16, LV_PART_MAIN);
-    lv_obj_set_style_text_color(label, color, LV_PART_MAIN);
-    return label;
-}
-
-// A transparent, borderless flex row used purely for grouping — the header's left/right
-// clusters and the vehicle row's left cluster all need "a few widgets side by side",
-// nothing more.
-lv_obj_t* CreateGroupRow(lv_obj_t* parent, lv_flex_align_t main_align) {
-    lv_obj_t* row = lv_obj_create(parent);
-    lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, LV_PART_MAIN);
-    lv_obj_set_style_border_width(row, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(row, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_column(row, 6, LV_PART_MAIN);
-    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(row, main_align, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_size(row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
-    return row;
 }
 
 lv_obj_t* CreateStatColumn(lv_obj_t* parent, const char* label_text) {
@@ -150,16 +112,8 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     const theme::Palette& colors = theme::Colors(config::Store().Get().dark_mode);
 
     lv_obj_t* card = lv_obj_create(parent);
-    lv_obj_add_style(card, theme::PanelStyle(), LV_PART_MAIN); // white panel on the grey
-                                                                 // screen bg, not flat —
-                                                                 // confirmed against the
-                                                                 // live quartz theme's
-                                                                 // `.panel` class
-    lv_obj_set_size(card, lv_pct(100), lv_pct(100)); // matches the flow-bar panel's
-                                                        // full-width sizing above it —
-                                                        // a 96%-centered inset here made
-                                                        // the two panels visibly
-                                                        // different widths
+    lv_obj_add_style(card, theme::PanelStyle(), LV_PART_MAIN);
+    lv_obj_set_size(card, lv_pct(100), lv_pct(100));
     lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_all(card, 16, LV_PART_MAIN);
     lv_obj_set_style_pad_row(card, 10, LV_PART_MAIN);
@@ -168,7 +122,7 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     widgets->chargepoint_id = chargepoint_id;
     lv_obj_set_user_data(card, widgets);
 
-    // Row 1: name (left) — lock button + state badge, adjacent, on the right.
+    // Header: name (left); lock + state badge (right).
     lv_obj_t* header_row = lv_obj_create(card);
     lv_obj_set_style_bg_opa(header_row, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(header_row, 0, LV_PART_MAIN);
@@ -179,54 +133,39 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     lv_obj_set_size(header_row, lv_pct(100), LV_SIZE_CONTENT);
     lv_obj_remove_flag(header_row, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t* header_left = CreateGroupRow(header_row, LV_FLEX_ALIGN_START);
-    CreateIconLabel(header_left, icon::Glyph::kBolt, colors.chargepoint);
+    lv_obj_t* header_left = widgets::CreateGroupRow(header_row, LV_FLEX_ALIGN_START);
+    widgets::CreateIconLabel(header_left, icon::Glyph::kBolt, colors.chargepoint);
     widgets->name_label = lv_label_create(header_left);
     lv_label_set_text(widgets->name_label, "Ladepunkt");
     lv_obj_set_style_text_font(widgets->name_label, &font_sans_14_bold, LV_PART_MAIN);
 
-    // main_align START, not END: content-sized flex containers with END alignment
-    // silently clipped their first child on this LVGL build (confirmed empirically via
-    // sim_screenshot — the lock icon below was invisible under END, fine under START).
-    // Visually identical here either way since header_right has no slack space beyond
-    // its own content.
-    lv_obj_t* header_right = CreateGroupRow(header_row, LV_FLEX_ALIGN_START);
-    // Icon-only toggle, not an accent action button like the +/- stepper — quartz shows
-    // this as a plain, quiet icon next to the badge, not a colored pill. The icon label
-    // itself is made clickable directly (an lv_label can take LV_OBJ_FLAG_CLICKABLE).
-    widgets->lock_icon_label = CreateIconLabel(header_right, icon::Glyph::kLockOpen, colors.muted);
-    // Bigger glyph + generous padding than the other (purely informational) icons in
-    // this card — this one's an actual touch control, meant to be tapped with a finger,
-    // not just read (plan: finger-sized tap targets, not icon-sized ones). The rounded
-    // pill background (track color, same as mode_switch's unselected track) makes it
-    // read as a tappable button rather than a bare icon floating in the header.
-    lv_obj_set_style_text_font(widgets->lock_icon_label, &font_icons_24, LV_PART_MAIN);
+    // START, not END: a content-sized flex container with END alignment clips its
+    // first child on this LVGL version.
+    lv_obj_t* header_right = widgets::CreateGroupRow(header_row, LV_FLEX_ALIGN_START);
+    widgets->lock_icon_label =
+        widgets::CreateIconLabel(header_right, icon::Glyph::kLockOpen, colors.muted, &font_icons_24);
     lv_obj_add_flag(widgets->lock_icon_label, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_style_pad_all(widgets->lock_icon_label, 10, LV_PART_MAIN);
     lv_obj_set_style_radius(widgets->lock_icon_label, LV_RADIUS_CIRCLE, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(widgets->lock_icon_label, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_bg_color(widgets->lock_icon_label, colors.bg, LV_PART_MAIN);
     lv_obj_add_event_cb(widgets->lock_icon_label, OnLockToggle, LV_EVENT_CLICKED, widgets);
-    widgets->lock_button = widgets->lock_icon_label;
 
     widgets->state_label = lv_label_create(header_right);
     lv_label_set_text(widgets->state_label, "-");
     lv_obj_set_style_text_font(widgets->state_label, &font_sans_11, LV_PART_MAIN);
     ApplyBadgeStyle(widgets->state_label, colors.muted, /*tinted=*/false);
 
-    // Row 2: openWB's own state_str message, verbatim, in a tinted info box.
+    // openWB's own state_str message, verbatim, in a tinted box.
     lv_obj_t* status_box = lv_obj_create(card);
     lv_obj_set_style_radius(status_box, theme::kRadiusSmall, LV_PART_MAIN);
     lv_obj_set_style_border_width(status_box, 0, LV_PART_MAIN);
     lv_obj_set_style_bg_color(status_box, colors.accent, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(status_box, static_cast<lv_opa_t>(28), LV_PART_MAIN); // ~11%
+    lv_obj_set_style_bg_opa(status_box, static_cast<lv_opa_t>(28), LV_PART_MAIN);
     lv_obj_set_style_pad_hor(status_box, 12, LV_PART_MAIN);
     lv_obj_set_style_pad_ver(status_box, 16, LV_PART_MAIN);
     lv_obj_set_size(status_box, lv_pct(100), LV_SIZE_CONTENT);
-    // Reserves room for ~2.5 lines of font_sans_14 (18px line height) up front, so the
-    // card's layout doesn't jump around between a short status ("Lädt") and a long one
-    // (openWB's own state_str messages can run to a full sentence) — it only grows
-    // beyond this if a message actually needs more than that.
+    // Reserves ~2.5 lines up front so the layout doesn't jump when a longer message arrives.
     lv_obj_set_style_min_height(status_box, 78, LV_PART_MAIN);
     lv_obj_remove_flag(status_box, LV_OBJ_FLAG_SCROLLABLE);
 
@@ -237,7 +176,7 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     lv_obj_set_style_text_color(widgets->status_box_label, colors.accent, LV_PART_MAIN);
     lv_label_set_text(widgets->status_box_label, "-");
 
-    // Row 3: connected vehicle + SoC.
+    // Connected vehicle + SoC.
     lv_obj_t* vehicle_row = lv_obj_create(card);
     lv_obj_set_style_bg_opa(vehicle_row, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(vehicle_row, 0, LV_PART_MAIN);
@@ -248,8 +187,8 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     lv_obj_set_size(vehicle_row, lv_pct(100), LV_SIZE_CONTENT);
     lv_obj_remove_flag(vehicle_row, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t* vehicle_left = CreateGroupRow(vehicle_row, LV_FLEX_ALIGN_START);
-    CreateIconLabel(vehicle_left, icon::Glyph::kCar, colors.car);
+    lv_obj_t* vehicle_left = widgets::CreateGroupRow(vehicle_row, LV_FLEX_ALIGN_START);
+    widgets::CreateIconLabel(vehicle_left, icon::Glyph::kCar, colors.car);
     widgets->vehicle_name_label = lv_label_create(vehicle_left);
     lv_label_set_text(widgets->vehicle_name_label, "Kein Fahrzeug bekannt");
 
@@ -257,14 +196,11 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     lv_obj_set_style_text_color(widgets->soc_label, colors.muted, LV_PART_MAIN);
     lv_label_set_text(widgets->soc_label, "");
 
-    // Row 4: chargemode selection.
     widgets->mode_switch = widgets::CreateModeSwitch(card, chargepoint_id);
 
-    // Row 5: +/- current stepper — mode-gated, only Sofort/instant takes a manual current.
     widgets->stepper_row = lv_obj_create(card);
     lv_obj_t* stepper_row = widgets->stepper_row;
-    lv_obj_add_flag(stepper_row, LV_OBJ_FLAG_HIDDEN); // shown only once the first poll
-                                                        // confirms Sofort/instant mode
+    lv_obj_add_flag(stepper_row, LV_OBJ_FLAG_HIDDEN);
     lv_obj_set_style_bg_opa(stepper_row, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_flex_flow(stepper_row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(stepper_row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -288,7 +224,7 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     lv_label_set_text(lv_label_create(plus_btn), "+");
     lv_obj_add_event_cb(plus_btn, OnCurrentStep, LV_EVENT_CLICKED, widgets);
 
-    // Row 6: read-only stats — Leistung (+ phases badge), Strom, Geladen.
+    // Stats: Leistung (+ phases badge), Strom, Geladen.
     lv_obj_t* stats_row = lv_obj_create(card);
     lv_obj_set_style_bg_opa(stats_row, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(stats_row, 0, LV_PART_MAIN);
@@ -299,7 +235,7 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     lv_obj_remove_flag(stats_row, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t* power_col = CreateStatColumn(stats_row, "Leistung");
-    lv_obj_t* power_value_row = CreateGroupRow(power_col, LV_FLEX_ALIGN_START);
+    lv_obj_t* power_value_row = widgets::CreateGroupRow(power_col, LV_FLEX_ALIGN_START);
     widgets->stat_power_label = lv_label_create(power_value_row);
     lv_obj_set_style_text_font(widgets->stat_power_label, &font_sans_14, LV_PART_MAIN);
     lv_label_set_text(widgets->stat_power_label, "0 W");
@@ -338,8 +274,6 @@ void RefreshChargepointCard(lv_obj_t* card, const openwb::ChargepointStatus& sta
         ApplyBadgeStyle(widgets->state_label, colors.muted, /*tinted=*/false);
     }
 
-    // openWB's own message, shown verbatim — falls back to the locally-derived short state
-    // text only if the server hasn't reported one yet (e.g. before the first update).
     lv_label_set_text(widgets->status_box_label, status.state_str[0] != '\0' ? status.state_str : state);
 
     widgets->locked = status.locked;
@@ -386,9 +320,6 @@ void RefreshChargepointCard(lv_obj_t* card, const openwb::ChargepointStatus& sta
 
     if (mode_known) {
         widgets::SetSelectedMode(widgets->mode_switch, mode);
-        // Only Sofort/instant takes a user-set fixed current — PV/Ziel/Eco compute it
-        // automatically and Stop charges at none (confirmed against openWB's own UI
-        // behavior, not a styling choice).
         if (openwb::ChargeModeHasManualCurrent(mode)) {
             lv_obj_remove_flag(widgets->stepper_row, LV_OBJ_FLAG_HIDDEN);
         } else {

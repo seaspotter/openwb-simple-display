@@ -1,81 +1,85 @@
 # openwb-simple-display
 
-A small ESP32-S3 touchscreen display for [openWB](https://openwb.de/) EV-charger
-installations: live chargepoint status at a glance, touch/swipe control of charge mode,
-current and lock state, a local web UI for device settings, and browser-based (no
-toolchain) firmware installation and updates.
+Ein kleines ESP32-S3-Touchscreen-Display für [openWB](https://openwb.de/)-Ladestationen:
+Ladepunkt-Status auf einen Blick, Touch-/Wisch-Steuerung von Lademodus, Ladestrom und
+Sperrzustand, eine lokale Weboberfläche für Geräteeinstellungen sowie browserbasierte
+(ohne Toolchain) Firmware-Installation und -Updates.
 
-**This is an independent, unofficial, community project.** It is not affiliated with,
-endorsed by, or supported by the openWB project or openWB GmbH & Co. KG. It is also not
-affiliated with, and does not share code with, the similar
-[evcc-garage-display](https://github.com/tobymarks/evcc-garage-display) project for the
-`evcc` charge controller, which inspired the idea of a dedicated garage/wall display for
-this product category.
+**Dies ist kein offizielles Produkt der openWB GmbH & Co. KG.** Der Autor arbeitet jedoch
+eng mit dem openWB-Team zusammen und entwickelt auch darüber hinaus Software für das
+Projekt.
 
 ## Status
 
-Early development. See [`docs/`](docs/) (once published) for the install page, and the
-milestones below for current progress.
+Frühe Entwicklungsphase. Siehe [`docs/`](docs/) (sobald veröffentlicht) für die
+Installationsseite sowie die Meilensteine unten für den aktuellen Fortschritt.
 
 ## Hardware
 
-- **Guition ESP32-4848S040C** — ESP32-S3, 4" 480×480 IPS touch panel (ST7701S RGB/DPI,
-  GT911 capacitive touch), USB-C powered. This is currently the only supported board.
+- **Guition ESP32-4848S040C** — ESP32-S3, 4″ 480×480 IPS-Touch-Panel (ST7701S RGB/DPI,
+  GT911 kapazitiver Touch), USB-C-Stromversorgung. Aktuell das einzig unterstützte Board.
 
-## Software requirements (your openWB installation)
+## Softwarevoraussetzungen (deine openWB-Installation)
 
-- openWB2 (current, MQTT/Python-based software). The display talks to openWB's built-in
-  `simpleAPI` HTTP endpoint (`/openWB/simpleAPI/simpleapi.php`), which is enabled by
-  default on every stock install — no configuration needed on the openWB side.
+- openWB2 (aktuelle, MQTT/Python-basierte Software). Das Display verbindet sich direkt
+  mit dem MQTT-Broker von openWB und liest/schreibt über dessen eigene
+  `simpleAPI`-MQTT-Themen (`openWB/simpleAPI/...`), die von openWBs eigenem
+  `simpleAPI_mqtt.py`-Daemon bereitgestellt werden — standardmäßig bei jeder
+  Standard-Installation aktiv, keine Konfiguration auf openWB-Seite nötig.
 
-## Building
+## Bauen
 
-This is a [PlatformIO](https://platformio.org/) project. It uses a git submodule for
-the board definition, so clone with `--recurse-submodules`, or run
-`git submodule update --init` after a plain clone.
-
-```sh
-pio run -e guition_4848s040c          # build
-pio run -e guition_4848s040c -t upload  # flash over USB-C
-pio test -e native_test                 # run host-side unit tests
-```
-
-Most users won't need any of this — once published, flashing a pre-built release is a
-one-click browser install from the project's GitHub Pages site, using
-[ESP Web Tools](https://esphome.github.io/esp-web-tools/) (Web Serial, Chrome/Edge only).
-
-### Seeing the UI without hardware
-
-The same `src/ui/*` code the firmware runs also builds as a desktop program — useful for
-checking layout/theme/text changes before touching real hardware:
+Dies ist ein [PlatformIO](https://platformio.org/)-Projekt. Es verwendet ein
+Git-Submodul für die Board-Definition — also mit `--recurse-submodules` klonen, oder
+nach einem einfachen Klon `git submodule update --init` ausführen.
 
 ```sh
-pio run -e sim_screenshot && .pio/build/sim_screenshot/program   # renders every
-                                                                   # screen to src/sim/out/*.bmp
-
-pio run -e sim_interactive && .pio/build/sim_interactive/program [--multi]  # live window,
-                                                                              # mouse = touch;
-                                                                              # needs libsdl2-dev
+pio run -e guition_4848s040c          # bauen
+pio run -e guition_4848s040c -t upload  # über USB-C flashen
+pio test -e native_test                 # Host-seitige Unit-Tests ausführen
 ```
 
-## Project structure
+Die meisten Nutzer werden davon nichts brauchen — sobald veröffentlicht, ist das Flashen
+eines fertigen Release ein Ein-Klick-Browser-Install über die GitHub-Pages-Seite des
+Projekts, mittels [ESP Web Tools](https://esphome.github.io/esp-web-tools/) (Web Serial,
+nur Chrome/Edge).
+
+### Die Oberfläche ohne Hardware ansehen
+
+Derselbe `src/ui/*`-Code, den die Firmware verwendet, lässt sich auch als
+Desktop-Programm bauen — nützlich, um Layout-/Theme-/Text-Änderungen zu prüfen, bevor
+echte Hardware angefasst wird:
+
+```sh
+pio run -e sim_screenshot && .pio/build/sim_screenshot/program   # rendert jeden
+                                                                   # Screen nach
+                                                                   # src/sim/out/*.bmp
+
+pio run -e sim_interactive && .pio/build/sim_interactive/program [--multi]  # echtes
+                                                               # Fenster, Maus = Touch;
+                                                               # benötigt libsdl2-dev
+```
+
+## Projektstruktur
 
 ```
-src/board/    hardware bring-up: display driver, touch driver, pin map
-src/config/   persistent settings (NVS), shared by all three UIs below
-src/net/      WiFi provisioning, network task
-src/openwb/   openWB simpleAPI client (status polling + control commands)
-src/state/    shared app state between the network task and the UI task
-src/ui/       LVGL screens, widgets, and the quartz-derived theme
-src/web/      local web settings server (ESPAsyncWebServer)
-src/ota/      firmware update manager
-src/sim/      desktop screenshot/interactive tools (see "Seeing the UI" above) — never
-              built into the real firmware
-tools/        font/icon asset generation, release packaging
-docs/         GitHub Pages site: landing page, web installer, release manifests
+src/board/    Hardware-Bring-up: Display-Treiber, Touch-Treiber, Pin-Zuordnung
+src/config/   Persistente Einstellungen (NVS), gemeinsam genutzt von Captive Portal
+              und Web-UI
+src/net/      WLAN-Einrichtung, Netzwerk-Task
+src/openwb/   openWB-MQTT-Anbindung (Status-Abonnement + Steuerbefehle)
+src/state/    Gemeinsamer App-Status zwischen Netzwerk-Task und UI-Task
+src/ui/       LVGL-Screens, Widgets und das von quartz abgeleitete Theme
+src/web/      Lokaler Web-Einstellungsserver (ESPAsyncWebServer) — einziger Ort für
+              Einstellungen außer dem WLAN-Reset (siehe src/ui/wifi_reset_prompt.h)
+src/ota/      Firmware-Update-Manager
+src/sim/      Desktop-Screenshot-/Interaktiv-Tools (siehe "Die Oberfläche ansehen" oben)
+              — werden nie in die echte Firmware eingebaut
+tools/        Font-/Icon-Asset-Erzeugung, Release-Paketierung
+docs/         GitHub-Pages-Seite: Startseite, Web-Installer, Release-Manifeste
 ```
 
-## License
+## Lizenz
 
-MIT — see [`LICENSE`](LICENSE). Bundled fonts and icons are separately licensed; see
-`tools/fonts/source/LICENSE` and `tools/icons/source/LICENSE`.
+MIT — siehe [`LICENSE`](LICENSE). Mitgelieferte Schriftarten und Icons stehen unter
+eigenen Lizenzen; siehe `tools/fonts/source/LICENSE` und `tools/icons/source/LICENSE`.

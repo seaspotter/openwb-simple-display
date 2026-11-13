@@ -25,9 +25,7 @@ WiFiClient g_plain_client;
 WiFiClientSecure g_secure_client;
 PubSubClient g_mqtt;
 
-// Maps an openWB-side chargepoint id (e.g. 3, 4 — whatever the user's install uses) to
-// this project's fixed-size AppState slot (0..kMaxChargepoints-1), mirroring the loop
-// the retired poller used to iterate configured chargepoints.
+// Maps an openWB-side chargepoint id to this project's fixed-size AppState slot.
 int SlotForChargepointId(uint8_t id) {
     const config::AppConfig& cfg = config::Store().Get();
     for (uint8_t i = 0; i < cfg.chargepoint_count && i < config::AppConfig::kMaxChargepoints; ++i) {
@@ -41,9 +39,7 @@ void HandleChargepointMessage(uint8_t id, const char* suffix, const char* payloa
     if (slot < 0) return;
 
     openwb::ChargepointStatus status = state::State().GetChargepointStatus(static_cast<uint8_t>(slot));
-    if (!ParseChargepointField(suffix, payload, status)) return; // unrecognized suffix —
-                                                                    // expected, see
-                                                                    // openwb_mqtt_topics.h
+    if (!ParseChargepointField(suffix, payload, status)) return; // unrecognized suffix
     status.id = id;
     status.valid = true;
     status.last_update_ms = millis();
@@ -67,30 +63,34 @@ void HandleGlobalMessage(const char* topic, const char* payload) {
     state::State().SetGlobalStatus(global);
 }
 
+// Matches "<prefix><id>/<rest>" and splits out the id and the part after the next '/'.
+bool ParseIdAfterPrefix(const char* topic, const char* prefix, uint8_t* out_id, const char** out_rest) {
+    size_t prefix_len = strlen(prefix);
+    if (strncmp(topic, prefix, prefix_len) != 0) return false;
+    const char* rest = topic + prefix_len;
+    const char* slash = strchr(rest, '/');
+    if (slash == nullptr) return false;
+    *out_id = static_cast<uint8_t>(atoi(rest));
+    *out_rest = slash + 1;
+    return true;
+}
+
 void OnMessage(char* topic, uint8_t* payload_bytes, unsigned int length) {
     char payload[256];
     size_t copy_len = length < sizeof(payload) - 1 ? length : sizeof(payload) - 1;
     memcpy(payload, payload_bytes, copy_len);
     payload[copy_len] = '\0';
 
-    if (strncmp(topic, kSimpleApiChargepointPrefix, strlen(kSimpleApiChargepointPrefix)) == 0) {
-        const char* rest = topic + strlen(kSimpleApiChargepointPrefix);
-        const char* slash = strchr(rest, '/');
-        if (slash == nullptr) return;
-        uint8_t id = static_cast<uint8_t>(atoi(rest));
-        HandleChargepointMessage(id, slash + 1, payload);
+    uint8_t id;
+    const char* rest;
+    if (ParseIdAfterPrefix(topic, kSimpleApiChargepointPrefix, &id, &rest)) {
+        HandleChargepointMessage(id, rest, payload);
         return;
     }
-
-    if (strncmp(topic, kRawChargepointPrefix, strlen(kRawChargepointPrefix)) == 0) {
-        const char* rest = topic + strlen(kRawChargepointPrefix);
-        const char* slash = strchr(rest, '/');
-        if (slash == nullptr) return;
-        uint8_t id = static_cast<uint8_t>(atoi(rest));
-        if (strcmp(slash + 1, "set/log") == 0) HandleLogMessage(id, payload);
+    if (ParseIdAfterPrefix(topic, kRawChargepointPrefix, &id, &rest)) {
+        if (strcmp(rest, "set/log") == 0) HandleLogMessage(id, payload);
         return;
     }
-
     HandleGlobalMessage(topic, payload);
 }
 
@@ -105,8 +105,6 @@ void Subscribe() {
 
     for (uint8_t i = 0; i < cfg.chargepoint_count && i < config::AppConfig::kMaxChargepoints; ++i) {
         char topic[48];
-        // Wildcard, not an enumerated field list: forward compatible with fields this
-        // project doesn't parse yet (openwb_mqtt_topics.h silently ignores them).
         snprintf(topic, sizeof(topic), "openWB/simpleAPI/chargepoint/%u/#", cfg.chargepoint_ids[i]);
         g_mqtt.subscribe(topic);
         snprintf(topic, sizeof(topic), "openWB/chargepoint/%u/set/log", cfg.chargepoint_ids[i]);
@@ -119,23 +117,18 @@ bool Connect() {
 
     Client* net_client = &g_plain_client;
     if (cfg.mqtt_use_tls) {
-        // Self-signed broker cert on the TLS listener, same leniency precedent as the
-        // retired HTTPS simpleAPI client had for openWB's own self-signed web cert.
-        if (!cfg.mqtt_validate_cert) g_secure_client.setInsecure();
+        if (!cfg.mqtt_validate_cert) g_secure_client.setInsecure(); // broker cert is self-signed
         net_client = &g_secure_client;
     }
     g_mqtt.setClient(*net_client);
     g_mqtt.setServer(cfg.mqtt_host, cfg.mqtt_port);
     g_mqtt.setCallback(OnMessage);
-    g_mqtt.setBufferSize(512); // default 256 is too small for the longer state_str
-                                 // messages and the set/log JSON payload
+    g_mqtt.setBufferSize(512); // default 256 is too small for state_str/set-log payloads
 
     char client_id[40];
     snprintf(client_id, sizeof(client_id), "%s-%08x", cfg.device_name,
               static_cast<unsigned>(ESP.getEfuseMac() & 0xFFFFFFFF));
 
-    // Empty username = anonymous connect — confirmed to work against the user's live
-    // instance, which runs openWB's default "unsecure" broker config.
     bool connected = cfg.mqtt_username[0] != '\0'
                           ? g_mqtt.connect(client_id, cfg.mqtt_username, cfg.mqtt_password)
                           : g_mqtt.connect(client_id);

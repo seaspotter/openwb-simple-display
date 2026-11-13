@@ -52,6 +52,19 @@ uint32_t AppState::LastTouchMillis() const {
     return copy;
 }
 
+void AppState::SetMqttConnected(bool connected) {
+    LOCK(&lock_);
+    mqtt_connected_ = connected;
+    UNLOCK(&lock_);
+}
+
+bool AppState::IsMqttConnected() const {
+    LOCK(&lock_);
+    bool copy = mqtt_connected_;
+    UNLOCK(&lock_);
+    return copy;
+}
+
 bool AppState::AnyChargepointCharging() const {
     LOCK(&lock_);
     bool any = false;

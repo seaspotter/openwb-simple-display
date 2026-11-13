@@ -1,14 +1,11 @@
-// Host-only stand-ins for the handful of board::/net:: functions the UI code calls
-// directly (plan §5/§6: screens/widgets only ever touch state::AppState and these two
-// modules' public functions, never WiFi/HTTP/display-driver internals directly) — lets
-// the sim_screenshot/sim_interactive envs link against the real src/ui/* code without
-// pulling in ESP-only dependencies (esp32-smartdisplay, WiFiManager, HTTPClient, ...).
-// Excluded from the real ESP build via platformio.ini's build_src_filter.
+// Host-only stand-ins for the board::/net::/ota:: functions the UI calls, so
+// sim_screenshot/sim_interactive can link without ESP-only dependencies.
 #include <cstdio>
 
 #include "board/display_driver.h"
 #include "net/net_task.h"
 #include "net/wifi_manager.h"
+#include "ota/ota_manager.h"
 
 namespace board {
 
@@ -32,7 +29,7 @@ bool EnqueueCommand(const CommandRequest& request) {
 }
 
 bool TryGetCommandResult(state::CommandResult& /*out_result*/) {
-    return false; // no pending results in the simulator — nothing async to resolve
+    return false;
 }
 
 void ResetAndReprovision() {
@@ -40,3 +37,26 @@ void ResetAndReprovision() {
 }
 
 } // namespace net
+
+namespace ota {
+
+bool IsUpdateAvailable() { return false; }
+
+UpdateCheckResult CheckForUpdate(bool /*auto_triggered*/) {
+    UpdateCheckResult result;
+    result.success = true;
+    snprintf(result.current_version, sizeof(result.current_version), "0.0.0-sim");
+    snprintf(result.latest_version, sizeof(result.latest_version), "0.0.0-sim");
+    result.update_available = false;
+    std::printf("[sim] ota::CheckForUpdate() called (no-op in simulator)\n");
+    return result;
+}
+
+InstallResult StartInstall(bool /*force*/) {
+    InstallResult result;
+    snprintf(result.reason, sizeof(result.reason), "nicht unterstützt im Simulator");
+    std::printf("[sim] ota::StartInstall() called (no-op in simulator)\n");
+    return result;
+}
+
+} // namespace ota

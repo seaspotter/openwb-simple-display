@@ -1,15 +1,9 @@
 # Name,     Type, SubType, Offset,   Size,     Flags
-# Dual-OTA + LittleFS layout for the 16MB flash Guition ESP32-4848S040C.
-# Flash size is an open item (plan §11) — confirm with `esptool.py flash_id` on the
-# actual board before relying on this; the Sunton board table and JSON agree on 16MB
-# but list PSRAM/flash ambiguously, so treat this file as provisional until confirmed.
-#
-# The data partition at 0xC10000 is mounted with LittleFS at runtime
-# (board_build.filesystem = littlefs in platformio.ini) but its SubType keyword here is
-# "spiffs", not "littlefs" — confirmed against the pinned platform@6.11.0's bundled
-# gen_esp32part.py, which doesn't recognize "littlefs" as a subtype name (that's purely
-# a partition-table label; esp-idf's convention predates LittleFS having its own
-# keyword, and any data partition works with either filesystem regardless of label).
+# Dual-OTA + LittleFS layout for the 16MB flash Guition ESP32-4848S040C — confirm actual
+# flash size with `esptool.py flash_id` before relying on this.
+# "littlefs" partition uses SubType "spiffs": the pinned gen_esp32part.py doesn't
+# recognize "littlefs" as a subtype name; it's mounted as LittleFS at runtime regardless
+# (board_build.filesystem = littlefs in platformio.ini).
 nvs,        data, nvs,     0x9000,   0x5000,
 otadata,    data, ota,     0xe000,   0x2000,
 app0,       app,  ota_0,   0x10000,  0x600000,

@@ -11,6 +11,7 @@
 .vscode/launch.json
 .vscode/ipch
 .DS_Store
+__pycache__/
 *.o
 *.bin
 !tools/release/*.bin

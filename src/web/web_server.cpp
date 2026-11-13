@@ -28,8 +28,7 @@ void InitServer() {
 
     RegisterApiRoutes(g_server);
 
-    // src/web/www/ is mirrored into data/ at build time (see README dev-setup note) so
-    // this serves exactly what's committed under src/web/www/, never a stale copy.
+    // src/web/www/ is mirrored into data/ at build time.
     g_server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
 
     g_server.begin();

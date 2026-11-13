@@ -42,4 +42,6 @@ const lv_style_t* ScreenStyle() { return &g_screen_style; }
 const lv_style_t* PanelStyle() { return &g_panel_style; }
 const lv_style_t* FlatButtonStyle() { return &g_flat_button_style; }
 
+void ApplyMsgboxFont(lv_obj_t* obj) { lv_obj_set_style_text_font(obj, &font_sans_14, LV_PART_MAIN); }
+
 } // namespace theme

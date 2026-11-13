@@ -1,5 +1,4 @@
-// REST-ish JSON endpoints backing the web settings UI (plan §7). Registered onto the
-// shared AsyncWebServer instance by web_server.cpp.
+// JSON API endpoints backing the web settings UI.
 #pragma once
 
 #include <ESPAsyncWebServer.h>

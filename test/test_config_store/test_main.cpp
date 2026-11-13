@@ -8,9 +8,7 @@ using config::ConfigStore;
 void setUp() {}
 void tearDown() {}
 
-// Under UNIT_TEST, config_store.cpp's NVS calls are compiled out (see its #ifndef
-// UNIT_TEST guards), so Load() always starts from DefaultConfig(). That's enough to
-// test the in-memory Get/Save/Update/ResetToDefaults contract without real hardware.
+// NVS calls are compiled out under UNIT_TEST, so Load() always starts from DefaultConfig().
 
 void test_get_returns_defaults_on_first_call() {
     ConfigStore store;

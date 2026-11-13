@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# Generates a small LVGL icon font from the Tabler Icons (MIT) webfont — icons as font
-# glyphs, exactly the same lv_font_conv tool and workflow as
-# tools/fonts/generate_fonts.sh, not a separate SVG-rasterization pipeline (an earlier,
-# abandoned plan for this file). Requires Node and lv_font_conv:
+# Generates LVGL icon fonts from the Tabler Icons (MIT) webfont. Requires lv_font_conv:
 # `npm install -g lv_font_conv`.
 set -euo pipefail
 
@@ -26,9 +23,8 @@ fi
 
 mkdir -p "${OUT_DIR}"
 
-# Codepoints confirmed against @tabler/icons-webfont@3.51.0's dist/tabler-icons.css
-# (the canonical codepoint -> icon-name map that ships with the font) — pin that
-# version if regenerating, since codepoints can shift between releases.
+# Codepoints per @tabler/icons-webfont@3.51.0's dist/tabler-icons.css; pin that version
+# if regenerating, since codepoints can shift between releases.
 #   0xEB30 sun            -> PV (Erzeugung)
 #   0xF00A plug-connected -> Netz (grid)
 #   0xEA38 bolt           -> Ladepunkte (chargepoints)
@@ -38,27 +34,29 @@ mkdir -p "${OUT_DIR}"
 #   0xEAE2 lock           -> chargepoint lock button (locked state)
 #   0xEB20 settings       -> future settings-gear use
 #   0xEBBB car            -> connected vehicle row
+#   0xEA06 alert-triangle -> status bar: a chargepoint has a fault
+#   0xEA71 cloud-download -> status bar: firmware update available
+#   0xEB52 wifi           -> status bar: MQTT connected
+#   0xECFA wifi-off       -> status bar: MQTT disconnected
 lv_font_conv \
   --font "${SOURCE_FONT}" \
   --size 16 \
   --bpp 4 \
   --format lvgl \
   --no-compress \
-  --range 0xEA34,0xEA38,0xEAE1,0xEAE2,0xEB20,0xEB30,0xEBBB,0xF00A,0xF336 \
+  --range 0xEA06,0xEA34,0xEA38,0xEA71,0xEAE1,0xEAE2,0xEB20,0xEB30,0xEB52,0xEBBB,0xECFA,0xF00A,0xF336 \
   --lv-font-name font_icons_16 \
   -o "${OUT_DIR}/font_icons_16.c"
 echo "generated font_icons_16.c"
 
-# 24px variant of just the lock/lock-open glyphs — used for the chargepoint lock toggle
-# specifically, which is a real touch control (not a decorative/informational icon like
-# the others), so it needs a bigger glyph + tap target than the 16px set above.
+# 24px: lock/lock-open (the lock toggle's tap target) plus the status bar's icons.
 lv_font_conv \
   --font "${SOURCE_FONT}" \
   --size 24 \
   --bpp 4 \
   --format lvgl \
   --no-compress \
-  --range 0xEAE1,0xEAE2 \
+  --range 0xEA06,0xEA71,0xEAE1,0xEAE2,0xEB20,0xEB52,0xECFA \
   --lv-font-name font_icons_24 \
   -o "${OUT_DIR}/font_icons_24.c"
 echo "generated font_icons_24.c"

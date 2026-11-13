@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""Packages a PlatformIO build's output artifacts (plan §9): copies the per-part
-binaries into docs/firmware/, and regenerates both manifest.json shapes —
-the ESP Web Tools install-time manifest (docs/manifest.json) and the device-facing
-OTA-check manifest (docs/firmware/ota/manifest.json) — computing part offsets from the
-actual partitions.csv rather than hand-maintaining them, so the two never drift apart.
+"""Packages a PlatformIO build into docs/firmware/ and writes the ESP Web Tools install
+manifest (docs/manifest.json) and the device-facing OTA manifest
+(docs/firmware/ota/manifest.json), signing the firmware's sha256 digest with the
+project's Ed25519 release key via `openssl` (see include/ota_signing_pubkey.h).
 
 Usage:
     python3 merge_firmware.py --build-dir .pio/build/guition_4848s040c \\
-        --project-dir . --version 1.2.0 --base-url https://<user>.github.io/openwb-display
-
-Run from CI (.github/workflows/pages.yml) after `pio run` and `pio run -t buildfs`.
+        --project-dir . --version 1.2.0 --base-url https://<user>.github.io/openwb-display \\
+        --private-key-file /path/to/ota_signing_private.pem
 """
 
 import argparse
 import hashlib
 import json
-import re
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 
@@ -42,6 +42,21 @@ def sha256_of(path: Path) -> str:
     return digest.hexdigest()
 
 
+def sign_digest_hex(digest_hex: str, private_key_file: Path) -> str:
+    """Ed25519-signs the raw sha256 digest bytes via `openssl`, returns hex."""
+    digest_bytes = bytes.fromhex(digest_hex)
+    with tempfile.TemporaryDirectory() as tmp:
+        digest_path = Path(tmp) / "digest.bin"
+        sig_path = Path(tmp) / "sig.bin"
+        digest_path.write_bytes(digest_bytes)
+        subprocess.run(
+            ["openssl", "pkeyutl", "-sign", "-inkey", str(private_key_file),
+             "-rawin", "-in", str(digest_path), "-out", str(sig_path)],
+            check=True, capture_output=True,
+        )
+        return sig_path.read_bytes().hex()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--build-dir", required=True, type=Path)
@@ -50,7 +65,20 @@ def main():
     parser.add_argument("--base-url", required=True,
                          help="e.g. https://<user>.github.io/openwb-display")
     parser.add_argument("--board-slug", default="guition_4848s040c")
+    parser.add_argument("--private-key-file", type=Path, default=None,
+                         help="Ed25519 private key (PEM) to sign the release with. "
+                              "Required unless --allow-unsigned is passed.")
+    parser.add_argument("--allow-unsigned", action="store_true",
+                         help="Skip signing, for local testing only — no device will "
+                              "accept the resulting manifest as an OTA update.")
+    parser.add_argument("--min-supported-version", default="0.0.0",
+                         help="Devices on an older firmware version refuse this OTA "
+                              "(see ota_manager.cpp) and must be reflashed manually. "
+                              "Default allows any version to update.")
     args = parser.parse_args()
+
+    if args.private_key_file is None and not args.allow_unsigned:
+        sys.exit("error: --private-key-file is required (or pass --allow-unsigned)")
 
     project_dir = args.project_dir.resolve()
     build_dir = args.build_dir.resolve()
@@ -77,10 +105,8 @@ def main():
             raise SystemExit(f"expected build artifact missing: {src}")
         (firmware_dir / dest_name).write_bytes(src.read_bytes())
 
-    # ESP Web Tools install manifest. Bootloader offset is fixed by the ESP32 boot ROM
-    # (0x0 for esp32/esp32s3 with this flash mode); partition table offset is also
-    # fixed at 0x8000 by convention — only the app and littlefs offsets come from this
-    # project's own partitions.csv.
+    # Bootloader/partition-table offsets are fixed by convention; app/littlefs come
+    # from partitions.csv.
     install_manifest = {
         "name": "openwb-simple-display",
         "version": args.version,
@@ -98,18 +124,24 @@ def main():
     }
     (docs_dir / "manifest.json").write_text(json.dumps(install_manifest, indent=2))
 
-    # Device-facing OTA-check manifest (ota_manifest.h's shape).
     firmware_url = f"{args.base_url}/firmware/{app_name}"
+    app_sha256 = sha256_of(firmware_dir / app_name)
+    firmware_field = {
+        "url": firmware_url,
+        "sha256": app_sha256,
+        "size_bytes": (firmware_dir / app_name).stat().st_size,
+    }
+    if args.private_key_file is not None:
+        firmware_field["signature"] = sign_digest_hex(app_sha256, args.private_key_file)
+    else:
+        print("WARNING: --allow-unsigned set — manifest has no signature; "
+              "no device will accept this as an OTA update", file=sys.stderr)
+
     ota_manifest = {
         "latest_version": args.version,
-        "min_supported_version": args.version,  # bump explicitly when a breaking change
-                                                 # in AppConfig::schema_version ships
+        "min_supported_version": args.min_supported_version,
         "release_notes_url": f"{args.base_url}/releases/{args.version}.html",
-        "firmware": {
-            "url": firmware_url,
-            "sha256": sha256_of(firmware_dir / app_name),
-            "size_bytes": (firmware_dir / app_name).stat().st_size,
-        },
+        "firmware": firmware_field,
     }
     (firmware_dir / "ota" / "manifest.json").write_text(json.dumps(ota_manifest, indent=2))
 

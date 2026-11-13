@@ -21,13 +21,7 @@ void Provision() {
     WiFiManager wm;
     wm.setSaveParamsCallback(OnSaveParams);
 
-    // Custom fields collected in the same first-boot flow as WiFi credentials (plan
-    // §4), pre-filled with whatever's already configured so re-entering setup doesn't
-    // lose existing values. TLS on/off is deliberately left out of this minimal portal —
-    // it defaults to the broker's plaintext listener (confirmed to work against the
-    // live instance) and can be switched on later via the full web settings UI, which
-    // fits this device's "intentionally thin on-device provisioning" scope better than
-    // a checkbox typed on a phone keyboard.
+    // TLS is intentionally not offered here; it defaults off and is set via the web UI.
     char port_buf[6];
     snprintf(port_buf, sizeof(port_buf), "%u", cfg.mqtt_port);
 
@@ -61,9 +55,7 @@ void Provision() {
             strlcpy(c.mqtt_username, username_param.getValue(), sizeof(c.mqtt_username));
             strlcpy(c.mqtt_password, password_param.getValue(), sizeof(c.mqtt_password));
             strlcpy(c.wifi_ssid, WiFi.SSID().c_str(), sizeof(c.wifi_ssid));
-            // WiFi password itself is not duplicated into AppConfig: WiFiManager
-            // persists it via the ESP32 WiFi stack's own NVS storage, and re-reading it
-            // back out isn't needed for anything this app does.
+            // WiFi password stays in the ESP32 WiFi stack's own NVS, not duplicated here.
         });
         util::LogInfo(kTag, "provisioning saved, rebooting into normal operation");
         delay(500);

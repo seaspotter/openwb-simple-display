@@ -7,8 +7,8 @@ namespace net {
 namespace time_sync {
 
 void Init() {
-    // Public NTP pool; openWB itself isn't a reliable time source to depend on here.
-    configTzTime("UTC0", "pool.ntp.org", "time.google.com");
+    // Europe/Berlin (CET/CEST), hardcoded to match this project's German-only UI.
+    configTzTime("CET-1CEST,M3.5.0,M10.5.0/3", "pool.ntp.org", "time.google.com");
 }
 
 } // namespace time_sync

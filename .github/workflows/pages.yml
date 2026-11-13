@@ -43,13 +43,21 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      - name: Write OTA signing key
+        # Written to the runner's temp dir, destroyed with the VM at job end — never
+        # persisted or cached.
+        run: |
+          umask 077
+          printf '%s' "${{ secrets.OTA_SIGNING_PRIVATE_KEY }}" > "$RUNNER_TEMP/ota_signing_private.pem"
+
       - name: Assemble release artifacts + manifests
         run: |
           python3 tools/release/merge_firmware.py \
             --build-dir .pio/build/guition_4848s040c \
             --project-dir . \
             --version "${{ steps.version.outputs.version }}" \
-            --base-url "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+            --base-url "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}" \
+            --private-key-file "$RUNNER_TEMP/ota_signing_private.pem"
 
       - uses: actions/configure-pages@v5
 

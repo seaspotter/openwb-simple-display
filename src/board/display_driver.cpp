@@ -5,9 +5,7 @@
 namespace board {
 
 lv_display_t* InitDisplay() {
-    // smartdisplay_init() brings up the ST7701S RGB/DPI panel and the GT911 touch
-    // controller together (board identified at compile time via the PlatformIO board id,
-    // see platformio.ini), and registers both with LVGL. It also sets backlight to 50%.
+    // Brings up the panel + GT911 touch and registers both with LVGL.
     smartdisplay_init();
     return lv_display_get_default();
 }

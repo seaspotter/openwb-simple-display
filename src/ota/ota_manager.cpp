@@ -15,15 +15,11 @@
 #include "config/config_store.h"
 #include "ota_gate.h"
 #include "ota_manifest.h"
+#include "ota_signing_pubkey.h"
+#include "third_party/ed25519/ed25519.h"
 #include "util/logging.h"
 
-// Provided by the build when CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y (sdkconfig.defaults):
-// the generated Mozilla CA root bundle linked into the firmware. Symbol name/behavior
-// is flagged for verification at M5 against the resolved arduino-esp32 core version.
-// setCACertBundle() takes just this one pointer on the pinned framework version — the
-// bundle format is self-describing (length-prefixed), unlike some other core releases
-// that want an explicit size argument; confirmed by the actual compile error against
-// WiFiClientSecure.h when a size arg was passed.
+// Mozilla CA root bundle, linked in via CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y.
 extern const uint8_t x509_crt_imported_bundle_bin_start[] asm(
     "_binary_x509_crt_bundle_start");
 
@@ -34,6 +30,7 @@ constexpr char kTag[] = "ota_manager";
 Manifest g_last_manifest;
 bool g_have_manifest = false;
 int g_install_progress = -1;
+bool g_update_available = false;
 
 void ApplyCaCertBundle(WiFiClientSecure& client) {
     client.setCACertBundle(x509_crt_imported_bundle_bin_start);
@@ -112,6 +109,7 @@ UpdateCheckResult CheckForUpdate(bool auto_triggered) {
     result.success = true;
     strlcpy(result.latest_version, manifest.latest_version, sizeof(result.latest_version));
     result.update_available = CompareVersions(manifest.latest_version, FW_VERSION) > 0;
+    g_update_available = result.update_available;
     return result;
 }
 
@@ -120,6 +118,11 @@ InstallResult StartInstall(bool force) {
 
     if (!g_have_manifest) {
         strlcpy(result.reason, "noch kein Manifest abgerufen; zuerst auf Update prüfen", sizeof(result.reason));
+        return result;
+    }
+    if (CompareVersions(FW_VERSION, g_last_manifest.min_supported_version) < 0) {
+        strlcpy(result.reason, "Firmware zu alt für dieses Update; bitte manuell per USB neu flashen",
+                sizeof(result.reason));
         return result;
     }
     if (!force && !ShouldAttemptAutomaticInstall()) {
@@ -153,16 +156,26 @@ InstallResult StartInstall(bool force) {
     uint8_t expected_sha256[32];
     bool have_expected_hash = HexToBytes(g_last_manifest.firmware_sha256, expected_sha256, 32);
     if (!have_expected_hash) {
-        util::LogWarn(kTag, "manifest sha256 missing/malformed, proceeding without verification");
+        util::LogWarn(kTag, "manifest sha256 missing/malformed — signature check below still applies");
+    }
+
+    uint8_t expected_signature[64];
+    bool have_expected_signature =
+        HexToBytes(g_last_manifest.firmware_signature, expected_signature, 64);
+    if (!have_expected_signature) {
+        // Refused outright, not just logged — otherwise signing could be bypassed by
+        // simply omitting the field.
+        util::LogError(kTag, "manifest has no valid firmware signature, refusing to install");
+        http.end();
+        strlcpy(result.reason, "Manifest enthält keine gültige Signatur", sizeof(result.reason));
+        return result;
     }
 
     mbedtls_sha256_context sha_ctx;
     mbedtls_sha256_init(&sha_ctx);
     mbedtls_sha256_starts(&sha_ctx, /*is224=*/0);
 
-    auto* stream = http.getStreamPtr(); // avoid hardcoding the exact client type name,
-                                         // which has shifted across arduino-esp32 core
-                                         // versions (WiFiClient vs NetworkClient)
+    auto* stream = http.getStreamPtr(); // type name differs across arduino-esp32 versions
     uint8_t buf[4096];
     int written_total = 0;
     g_install_progress = 0;
@@ -191,12 +204,24 @@ InstallResult StartInstall(bool force) {
     mbedtls_sha256_finish(&sha_ctx, actual_sha256);
     mbedtls_sha256_free(&sha_ctx);
 
+    // Checked separately from the signature below for a clearer error on plain corruption.
     bool hash_ok = !have_expected_hash || (memcmp(actual_sha256, expected_sha256, 32) == 0);
-
     if (!hash_ok) {
         util::LogError(kTag, "downloaded firmware sha256 mismatch, aborting install");
         Update.abort();
         strlcpy(result.reason, "sha256 stimmt nicht überein", sizeof(result.reason));
+        g_install_progress = -1;
+        return result;
+    }
+
+    // Verified against the actual downloaded digest, not the manifest's own claimed
+    // sha256 — catches a tampered binary even if that field was forged to match it.
+    bool signature_ok =
+        ed25519_verify(expected_signature, actual_sha256, sizeof(actual_sha256), kOtaSigningPublicKey) != 0;
+    if (!signature_ok) {
+        util::LogError(kTag, "firmware signature verification failed, aborting install");
+        Update.abort();
+        strlcpy(result.reason, "Signaturprüfung fehlgeschlagen", sizeof(result.reason));
         g_install_progress = -1;
         return result;
     }
@@ -216,6 +241,8 @@ InstallResult StartInstall(bool force) {
 }
 
 int InstallProgressPercent() { return g_install_progress; }
+
+bool IsUpdateAvailable() { return g_update_available; }
 
 void MarkAppValidAfterSuccessfulBoot() {
     static bool already_marked = false;
