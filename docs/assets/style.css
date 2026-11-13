@@ -53,7 +53,31 @@ h1 {
 
 p.subtitle {
     color: var(--muted);
+    margin: 0 0 20px;
+}
+
+.quicklinks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
     margin: 0 0 32px;
+}
+
+.quicklinks a {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.quicklinks a:hover {
+    border-color: var(--accent);
 }
 
 .panel {
@@ -62,6 +86,7 @@ p.subtitle {
     border-radius: var(--radius);
     padding: 24px;
     margin-bottom: 24px;
+    scroll-margin-top: 24px;
 }
 
 .panel h2 {
