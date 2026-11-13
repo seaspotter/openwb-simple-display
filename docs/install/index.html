@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>openwb-simple-display installieren</title>
+<link rel="stylesheet" href="../assets/style.css" />
+<!-- ESP Web Tools: browser-based flashing over Web Serial (Chrome/Edge, desktop only,
+     requires https — this page is served over https by GitHub Pages). Version pinned
+     per the Artifact-authoring convention of naming an exact, non-latest version.
+     Note: the <esp-web-install-button> widget's own internal labels (e.g. "Erase
+     device") come from that third-party component and stay in English — this project
+     doesn't control their text. -->
+<script type="module" src="https://unpkg.com/esp-web-tools@10.1.0/dist/web/install-button.js?module"></script>
+</head>
+<body>
+<main>
+  <h1>Firmware installieren</h1>
+  <p class="subtitle">Funktioniert in Chrome oder Edge auf einem Desktop-Computer. Der
+    Browser braucht Zugriff auf USB-Seriell-Ports, was nur Desktop-Chromium-Browser
+    unterstützen.</p>
+
+  <section class="panel">
+    <ol>
+      <li>Verbinde das Display per USB-C-Kabel mit deinem Computer (ein Kabel, das
+        Daten übertragen kann, nicht nur ein Ladekabel).</li>
+      <li>Klicke unten auf <strong>Installieren</strong> und wähle den seriellen Port
+        aus der Liste (meist "USB Serial" oder ähnlich benannt). Ein Druck auf den
+        BOOT-Knopf ist nicht nötig — das Board wechselt selbstständig in den
+        Flash-Modus.</li>
+      <li>Flasht du das Board zum ersten Mal? Setze ein Häkchen bei
+        <strong>Erase device</strong>, um die werkseitig vorinstallierte Demo-Firmware
+        zu entfernen. Spielst du nur ein Update auf? Lass das Häkchen weg, damit WLAN-
+        und openWB-Einstellungen erhalten bleiben.</li>
+      <li>Nach dem Flashen mit dem Handy oder Computer das WLAN
+        <code>openwb-simple-display-setup</code> verbinden, um die Einrichtung
+        abzuschließen.</li>
+    </ol>
+
+    <esp-web-install-button manifest="../manifest.json">
+      <button slot="activate" class="button" style="border:none;cursor:pointer;">Installieren</button>
+      <span slot="unsupported">Dein Browser kann keine Firmware installieren — versuche
+        es mit Chrome oder Edge auf einem Desktop-Computer.</span>
+      <span slot="not-allowed">Diese Seite muss über https ausgeliefert werden, um
+        Firmware installieren zu können (das ist bei GitHub Pages bereits der Fall —
+        versuche, die Seite neu zu laden).</span>
+    </esp-web-install-button>
+  </section>
+
+  <section class="panel">
+    <h2>Problembehandlung</h2>
+    <p>Wenn die Portliste leer ist oder der Flash-Vorgang mittendrin abbricht, das
+      USB-C-Kabel abziehen und wieder anschließen, sicherstellen, dass es ein
+      Datenkabel ist (kein reines Ladekabel), und es erneut versuchen. Unter Windows
+      wird je nach USB-Seriell-Chip des Boards eventuell der CH340-USB-Treiber
+      benötigt, falls kein Port angezeigt wird.</p>
+  </section>
+</main>
+</body>
+</html>

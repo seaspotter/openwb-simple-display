@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>openwb-simple-display Einstellungen</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<main>
+  <h1 id="device-title">openwb-simple-display</h1>
+
+  <section class="panel">
+    <h2>Live-Status</h2>
+    <div id="status-rows">Lädt…</div>
+  </section>
+
+  <section class="panel">
+    <h2>MQTT-Broker (openWB)</h2>
+    <label for="mqtt_host">Host oder IP</label>
+    <input id="mqtt_host" placeholder="192.168.1.50" />
+    <label for="mqtt_port">Port</label>
+    <input id="mqtt_port" type="number" value="1883" />
+    <label for="mqtt_username">Benutzername (optional)</label>
+    <input id="mqtt_username" placeholder="leer = anonym" />
+    <label for="mqtt_password">Passwort (leer lassen, um aktuelles zu behalten)</label>
+    <input id="mqtt_password" type="password" placeholder="unverändert" />
+    <label for="mqtt_use_tls">Verbindung</label>
+    <select id="mqtt_use_tls">
+      <option value="false">Unverschlüsselt (Port 1883)</option>
+      <option value="true">TLS (Port 8883)</option>
+    </select>
+  </section>
+
+  <section class="panel">
+    <h2>Display</h2>
+    <label for="brightness_pct">Helligkeit (%)</label>
+    <input id="brightness_pct" type="number" min="10" max="100" />
+    <label for="screen_timeout_s">Bildschirm-Timeout (Sekunden, 0 = nie)</label>
+    <input id="screen_timeout_s" type="number" min="0" />
+    <label for="dark_mode">Darstellung</label>
+    <select id="dark_mode">
+      <option value="false">Hell</option>
+      <option value="true">Dunkel</option>
+    </select>
+    <button id="save-btn">Einstellungen speichern</button>
+  </section>
+
+  <section class="panel">
+    <h2>Firmware</h2>
+    <div class="status-row"><span>Version</span><span class="value" id="fw-version">-</span></div>
+    <button class="secondary" id="check-update-btn">Auf Update prüfen</button>
+    <button id="install-update-btn" style="display:none">Update installieren</button>
+    <div id="ota-status"></div>
+  </section>
+
+  <section class="panel">
+    <h2>WLAN</h2>
+    <p>Setzt die WLAN-Zugangsdaten zurück und startet das Display im Einrichtungsmodus neu.
+      Die gleiche Aktion ist auch direkt am Display per langem Druck auf die obere Fläche
+      möglich — nützlich falls diese Weboberfläche nicht mehr erreichbar ist.</p>
+    <button class="secondary" id="reset-wifi-btn">WLAN zurücksetzen</button>
+  </section>
+</main>
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>

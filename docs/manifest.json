@@ -1,0 +1,27 @@
+{
+  "name": "openwb-simple-display",
+  "version": "0.1.0-test",
+  "builds": [
+    {
+      "chipFamily": "ESP32-S3",
+      "parts": [
+        {
+          "path": "firmware/bootloader.bin",
+          "offset": 0
+        },
+        {
+          "path": "firmware/partitions.bin",
+          "offset": 32768
+        },
+        {
+          "path": "firmware/openwb-simple-display-0.1.0-test-guition_4848s040c.bin",
+          "offset": 65536
+        },
+        {
+          "path": "firmware/littlefs.bin",
+          "offset": 12648448
+        }
+      ]
+    }
+  ]
+}

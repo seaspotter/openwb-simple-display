@@ -1,0 +1,51 @@
+#include <unity.h>
+
+#include "config/config_store.h"
+
+using config::AppConfig;
+using config::ConfigStore;
+
+void setUp() {}
+void tearDown() {}
+
+// Under UNIT_TEST, config_store.cpp's NVS calls are compiled out (see its #ifndef
+// UNIT_TEST guards), so Load() always starts from DefaultConfig(). That's enough to
+// test the in-memory Get/Save/Update/ResetToDefaults contract without real hardware.
+
+void test_get_returns_defaults_on_first_call() {
+    ConfigStore store;
+    const AppConfig& cfg = store.Get();
+    TEST_ASSERT_EQUAL_UINT8(config::kCurrentSchemaVersion, cfg.schema_version);
+    TEST_ASSERT_EQUAL_UINT16(1883, cfg.mqtt_port);
+}
+
+void test_save_then_get_reflects_the_change() {
+    ConfigStore store;
+    AppConfig updated = store.Get();
+    updated.mqtt_port = 8883;
+    store.Save(updated);
+
+    TEST_ASSERT_EQUAL_UINT16(8883, store.Get().mqtt_port);
+}
+
+void test_update_applies_mutator_and_persists() {
+    ConfigStore store;
+    store.Update([](AppConfig& c) { c.brightness_pct = 42; });
+    TEST_ASSERT_EQUAL_UINT8(42, store.Get().brightness_pct);
+}
+
+void test_reset_to_defaults_discards_changes() {
+    ConfigStore store;
+    store.Update([](AppConfig& c) { c.brightness_pct = 5; });
+    store.ResetToDefaults();
+    TEST_ASSERT_EQUAL_UINT8(AppConfig{}.brightness_pct, store.Get().brightness_pct);
+}
+
+int main(int /*argc*/, char** /*argv*/) {
+    UNITY_BEGIN();
+    RUN_TEST(test_get_returns_defaults_on_first_call);
+    RUN_TEST(test_save_then_get_reflects_the_change);
+    RUN_TEST(test_update_applies_mutator_and_persists);
+    RUN_TEST(test_reset_to_defaults_discards_changes);
+    return UNITY_END();
+}

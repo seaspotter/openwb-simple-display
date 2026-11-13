@@ -1,0 +1,143 @@
+/* Palette matches theme_colors.h / theme_quartz.cpp exactly — keep both in sync if the
+   quartz theme is ever retuned. */
+:root {
+    --bg: #f1f2f4;
+    --panel: #ffffff;
+    --border: #e3e5e9;
+    --text: #1a1d24;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --warning: #ea580c;
+    --error: #e11d48;
+    --pv: #1f9d55;
+    --grid: #dc2626;
+    --chargepoint: #2563eb;
+    --battery: #eab308;
+    --car: #0d9488;
+    --consumer: #7c3aed;
+    --radius: 14px;
+}
+
+[data-theme="dark"] {
+    --bg: #0a0b0d;
+    --panel: #1f232b;
+    --border: #343a46;
+    --text: #e7e9ee;
+    --muted: #9aa0ac;
+    --warning: #fb923c;
+    --error: #fb7185;
+    --pv: #3ec776;
+    --grid: #f87171;
+    --chargepoint: #5b9bff;
+    --battery: #facc15;
+    --car: #2dd4bf;
+    --consumer: #a78bfa;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    padding: 24px 16px 64px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+        "Noto Sans", Arial, sans-serif;
+}
+
+main {
+    max-width: 480px;
+    margin: 0 auto;
+}
+
+h1 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0 0 16px;
+}
+
+.panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.panel h2 {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    margin: 0 0 12px;
+    font-weight: 600;
+}
+
+label {
+    display: block;
+    font-size: 0.8125rem;
+    margin: 12px 0 4px;
+    color: var(--muted);
+}
+
+input, select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 0.875rem;
+}
+
+button {
+    appearance: none;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    margin-top: 12px;
+}
+
+button.secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+}
+
+.status-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 0.875rem;
+}
+
+.status-row .value { font-weight: 600; }
+.tag-pv { color: var(--pv); }
+.tag-grid { color: var(--grid); }
+.tag-chargepoint { color: var(--chargepoint); }
+.tag-battery { color: var(--battery); }
+.tag-consumer { color: var(--consumer); }
+
+#toast {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: var(--text);
+    color: var(--bg);
+    font-size: 0.8125rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+}
+#toast.visible { opacity: 1; }

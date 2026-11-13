@@ -1,0 +1,46 @@
+# ESP-IDF sdkconfig overrides for the Guition ESP32-4848S040C (ESP32-S3, ST7701S RGB panel).
+#
+# These address known tearing/glitch issues with the esp_lcd RGB/DPI panel driver under
+# PSRAM/flash/WiFi contention — see evcc-garage-display's README for the same set of flags
+# used on this same board family; applied here independently as standard esp_lcd RGB-panel
+# stability practice, not copied code.
+#
+# CONFIRMED INERT with the current build setup (`platform = espressif32@6.11.0`,
+# `framework = arduino` using the prebuilt framework-arduinoespressif32 package — not an
+# ESP-IDF-component build): a verbose build (`pio run -v`) shows no reference to
+# sdkconfig.defaults at all, because the Arduino core ships as prebuilt static libraries
+# Espressif already compiled with their own sdkconfig choices; a plain-Arduino PlatformIO
+# project never runs the Kconfig/menuconfig step that would consume this file. Getting
+# these flags to actually apply would need the "Arduino as an ESP-IDF component" build
+# flow (e.g. via the pioarduino platform fork, or `framework = arduino, espidf`), which
+# is a bigger change not attempted here. In practice esp32-smartdisplay appears to
+# manage RGB-panel stability internally (it's widely used on this exact board via plain
+# Arduino), so this is lower-risk than it sounds — but if tearing shows up during M1
+# hardware bring-up, this inertness is the first thing to revisit, not these flags'
+# values.
+
+# Avoid XIP-from-flash stalls corrupting RGB panel timing while PSRAM is used for the
+# framebuffer.
+CONFIG_SPIRAM_XIP_FROM_PSRAM=y
+
+# Keep the RGB panel's refresh ISR safe to run even while the IRAM/flash cache is briefly
+# unavailable (e.g. during a flash write), avoiding visible tearing.
+CONFIG_LCD_RGB_ISR_IRAM_SAFE=y
+
+# Restart (resync) the RGB panel transfer on VSYNC rather than mid-frame if a stall occurs.
+CONFIG_LCD_RGB_RESTART_IN_VSYNC=y
+
+# Dual-partition OTA rollback: a newly flashed app must explicitly confirm itself valid
+# (see src/main.cpp) within one boot, or the bootloader reverts to the previous OTA slot.
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+
+# GT911 touch is on I2C; LCD data/sync pins overlap native-USB pins (GPIO19/20) on this
+# board — keep CDC-on-boot off so the native USB peripheral doesn't contend with them.
+CONFIG_ARDUINO_USB_CDC_ON_BOOT=n
+
+# Bundled Mozilla CA root store, so OTA manifest/firmware fetches over HTTPS (GitHub
+# Pages) can validate the TLS certificate instead of using WiFiClientSecure::setInsecure()
+# (plan §9 explicitly rules that out for release builds). Verify this flag name/behavior
+# against the actual arduino-esp32 core version resolved at M5 — it's moved around
+# across core releases.
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
