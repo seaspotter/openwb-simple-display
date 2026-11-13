@@ -1,3 +1,4 @@
+/* Design tokens kept in sync with src/web/www/style.css / theme_colors.h (the quartz theme). */
 :root {
     --bg: #f1f2f4;
     --panel: #ffffff;
@@ -5,6 +6,11 @@
     --text: #1a1d24;
     --muted: #6b7280;
     --accent: #2563eb;
+    --accent-tint: rgba(37, 99, 235, 0.12);
+    --pv: #1f9d55;
+    --chargepoint: #2563eb;
+    --battery: #eab308;
+    --car: #0d9488;
     --radius: 14px;
 }
 
@@ -15,6 +21,11 @@
         --border: #343a46;
         --text: #e7e9ee;
         --muted: #9aa0ac;
+        --accent-tint: rgba(91, 155, 255, 0.16);
+        --pv: #3ec776;
+        --chargepoint: #5b9bff;
+        --battery: #facc15;
+        --car: #2dd4bf;
     }
 }
 
@@ -53,6 +64,111 @@ p.subtitle {
     margin-bottom: 24px;
 }
 
+.panel h2 {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    font-weight: 600;
+    margin: 0 0 16px;
+}
+
+.panel ul, .panel ol {
+    margin: 0;
+    padding-left: 1.25em;
+}
+
+.panel li + li {
+    margin-top: 8px;
+}
+
+.feature-list {
+    list-style: none;
+    padding-left: 0;
+}
+
+.feature-list li {
+    position: relative;
+    padding-left: 22px;
+}
+
+.feature-list li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.5em;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--dot);
+}
+
+.feature-list li:nth-child(1) { --dot: var(--pv); }
+.feature-list li:nth-child(2) { --dot: var(--chargepoint); }
+.feature-list li:nth-child(3) { --dot: var(--car); }
+.feature-list li:nth-child(4) { --dot: var(--battery); }
+
+.steps {
+    list-style: none;
+    padding-left: 0;
+    counter-reset: step;
+}
+
+.steps li {
+    position: relative;
+    padding-left: 36px;
+    counter-increment: step;
+}
+
+.steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: -2px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--accent-tint);
+    color: var(--accent);
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.steps + p, .steps + a.button {
+    margin-top: 16px;
+}
+
+.screenshots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin: 0 0 32px;
+}
+
+.screenshots figure {
+    flex: 1 1 200px;
+    max-width: 260px;
+    margin: 0;
+}
+
+.screenshots img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.screenshots figcaption {
+    text-align: center;
+    font-size: 0.8125rem;
+    color: var(--muted);
+    margin-top: 8px;
+}
+
 a.button {
     display: inline-block;
     background: var(--accent);
@@ -61,6 +177,24 @@ a.button {
     padding: 12px 20px;
     border-radius: 8px;
     font-weight: 500;
+    font-size: 0.9375rem;
+}
+
+.status-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 6px 0;
+    font-size: 0.9375rem;
+}
+
+.status-row .value {
+    font-weight: 600;
+    text-align: right;
+}
+
+.status-row + .status-row {
+    border-top: 1px solid var(--border);
 }
 
 .disclaimer {

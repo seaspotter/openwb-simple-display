@@ -11,20 +11,89 @@
 <main>
   <h1>openwb-simple-display</h1>
   <p class="subtitle">
-    Ein kleines ESP32-Touchscreen-Display für <a href="https://openwb.de/">openWB</a>-
-    Installationen: Ladepunkt-Status auf einen Blick, Touch-Steuerung des Lademodus.
+    Ein kleines ESP32-S3-Touchscreen-Display für <a href="https://openwb.de/">openWB</a>-
+    Ladestationen: Ladepunkt-Status auf einen Blick, Touch-Steuerung von Lademodus,
+    Ladestrom und Sperrzustand — ohne App, ohne Cloud, direkt über MQTT mit deiner
+    eigenen openWB-Installation verbunden.
   </p>
 
+  <div class="screenshots">
+    <figure>
+      <img src="assets/screenshot-light.png" alt="Display im hellen Design" width="480" height="480" />
+      <figcaption>Hell</figcaption>
+    </figure>
+    <figure>
+      <img src="assets/screenshot-dark.png" alt="Display im dunklen Design" width="480" height="480" />
+      <figcaption>Dunkel</figcaption>
+    </figure>
+  </div>
+
   <section class="panel">
-    <h2>Los geht's</h2>
-    <p>Display direkt im Browser flashen, ohne Software-Installation.</p>
+    <h2>Funktionen</h2>
+    <ul class="feature-list">
+      <li>Live-Status: PV, Netz, Speicher, Verbraucher und jeder Ladepunkt auf einen Blick</li>
+      <li>Touch-Steuerung: Lademodus, Ladestrom, Sperren/Entsperren direkt am Display</li>
+      <li>Lokale Weboberfläche für Geräteeinstellungen, erreichbar per Browser im eigenen Netzwerk</li>
+      <li>Firmware-Installation und -Updates direkt im Browser, ohne Toolchain</li>
+    </ul>
+  </section>
+
+  <section class="panel">
+    <h2>Voraussetzungen</h2>
+    <p>Eine laufende <strong>openWB2</strong>-Installation (MQTT-basierte Software), deren
+      MQTT-Broker im lokalen Netzwerk erreichbar ist. Standardmäßig ist das ohne weitere
+      Konfiguration auf openWB-Seite der Fall.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Installation</h2>
+    <p>Firmware direkt im Browser flashen — mit Chrome oder Edge, ohne Software-Installation.</p>
+    <ol class="steps">
+      <li>Display per USB-C-<strong>Datenkabel</strong> (kein reines Ladekabel) mit dem
+        Computer verbinden.</li>
+      <li>Unten auf „Firmware installieren" klicken und im Browser-Dialog den seriellen
+        Port des Displays auswählen.</li>
+      <li>„Install" wählen und warten, bis der Flash-Vorgang abgeschlossen ist
+        (ca. 1–2 Minuten).</li>
+    </ol>
     <a class="button" href="install/">Firmware installieren</a>
   </section>
 
   <section class="panel">
+    <h2>Einrichtung</h2>
+    <ol class="steps">
+      <li>Nach dem Flashen zeigt das Display ein eigenes WLAN namens
+        <code>openwb-simple-display-setup</code> — mit dem Handy oder Computer damit
+        verbinden.</li>
+      <li>Im sich öffnenden Einrichtungsassistenten das eigene WLAN sowie Host, Port,
+        Benutzername und Passwort des openWB-MQTT-Brokers eintragen.</li>
+      <li>Das Display startet neu, verbindet sich und zeigt innerhalb weniger Sekunden
+        die Live-Daten des konfigurierten Ladepunkts.</li>
+      <li>Weitere Einstellungen (Helligkeit, Firmware-Updates, optionaler PIN-Schutz)
+        über die lokale Weboberfläche unter <code>http://openwb-simple-display.local</code>.</li>
+    </ol>
+  </section>
+
+  <section class="panel">
+    <h2>Einstellungen</h2>
+    <p>Helligkeit und Firmware-Updates direkt am Display, alles andere (MQTT-Broker,
+      Bildschirm-Timeout, PIN-Schutz, WLAN-Reset) über die lokale Weboberfläche.</p>
+    <div class="screenshots">
+      <figure>
+        <img src="assets/screenshot-settings.png" alt="Einstellungen direkt am Display" width="480" height="480" />
+        <figcaption>Am Display</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/screenshot-web-ui.png" alt="Einstellungen in der Weboberfläche im Browser" width="480" height="980" />
+        <figcaption>Im Browser</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="panel">
     <h2>Hardware</h2>
-    <p>Aktuell unterstützt: <strong>Guition ESP32-4848S040C</strong> (ESP32-S3, 4&Prime;
-    480&times;480 Touch-Panel).</p>
+    <div class="status-row"><span>Board</span><span class="value">Guition ESP32-4848S040C</span></div>
+    <div class="status-row"><span>Display</span><span class="value">4&Prime; 480&times;480 Touch</span></div>
   </section>
 
   <section class="panel">
