@@ -25,8 +25,15 @@ struct Palette {
 };
 
 // lv_color_make() isn't constexpr, so these are runtime-initialized const globals.
+//
+// bg is 0xf0f4f0, not quartz's web hex 0xf1f2f4: the real panel is RGB565 (LV_COLOR_DEPTH
+// 16, see lv_conf.h), which truncates to 5/6/5 bits per channel. 0xf1f2f4's R and B both
+// truncate into the same 5-bit bucket while G doesn't, so it renders back as (246,242,246)
+// — a visible magenta cast on real hardware despite being correct in the source. 0xf0f4f0
+// round-trips through that same truncation to an exactly neutral (246,246,246), which is
+// what actually shows up on the display.
 inline const Palette kLightPalette = {
-    .bg = lv_color_make(0xf1, 0xf2, 0xf4),
+    .bg = lv_color_make(0xf0, 0xf4, 0xf0),
     .panel = lv_color_make(0xff, 0xff, 0xff),
     .border = lv_color_make(0xe3, 0xe5, 0xe9),
     .text = lv_color_make(0x1a, 0x1d, 0x24),
