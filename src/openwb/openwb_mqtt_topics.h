@@ -39,6 +39,8 @@ inline bool ParseChargepointField(const char* suffix, const char* payload, Charg
         CopyString(out.chargemode, sizeof(out.chargemode), payload);
     } else if (strcmp(suffix, "soc/soc") == 0) {
         out.soc_percent = static_cast<float>(atof(payload));
+    } else if (strcmp(suffix, "soc/range") == 0) {
+        out.range_km = static_cast<float>(atof(payload));
     } else if (strcmp(suffix, "vehicle_name") == 0) {
         CopyString(out.connected_vehicle_name, sizeof(out.connected_vehicle_name), payload);
     } else if (strcmp(suffix, "phases_in_use") == 0) {

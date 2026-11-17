@@ -43,6 +43,10 @@ async function loadStatus() {
       rows.push(rowHtml("Speicher-Ladestand", `${Math.round(data.global.battery_soc_percent)}%`, "tag-battery"));
     }
     rows.push(rowHtml("Verbraucher", `${Math.round(data.global.consumer_power_w)} W`, "tag-consumer"));
+    rows.push(rowHtml("Hausverbrauch", `${Math.round(data.global.home_consumption_w)} W`, "tag-home"));
+    if (data.global.meter_power_w) {
+      rows.push(rowHtml("Zähler", `${Math.round(data.global.meter_power_w)} W`, "tag-grid"));
+    }
   }
   for (const cp of data.chargepoints || []) {
     const label = cp.charging ? "Lädt" : cp.plugged ? "Angesteckt, wartet" : "Nicht angesteckt";

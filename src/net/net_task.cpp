@@ -18,6 +18,10 @@ QueueHandle_t g_command_queue = nullptr;
 QueueHandle_t g_result_queue = nullptr;
 TaskHandle_t g_task_handle = nullptr;
 
+// See AppState::SetPendingBrightnessSave — lands the NVS commit (which briefly halts
+// both cores, not just this one) well after the user's finger has left the slider.
+constexpr uint32_t kBrightnessSaveDebounceMs = 1500;
+
 // MQTT writes are fire-and-forget; the only failure detectable here is no broker connection.
 state::CommandResult ExecuteCommand(const CommandRequest& req) {
     state::CommandResult result;
@@ -84,7 +88,7 @@ void NetTask(void* /*param*/) {
         }
 
         uint8_t pending_brightness;
-        if (state::State().TryTakePendingBrightnessSave(&pending_brightness)) {
+        if (state::State().TryTakePendingBrightnessSave(now, kBrightnessSaveDebounceMs, &pending_brightness)) {
             config::Store().Update(
                 [pending_brightness](config::AppConfig& c) { c.brightness_pct = pending_brightness; });
         }

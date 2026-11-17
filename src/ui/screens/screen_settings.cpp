@@ -35,7 +35,7 @@ void OnBrightnessChanged(lv_event_t* e) {
 void OnBrightnessReleased(lv_event_t* e) {
     lv_obj_t* slider = static_cast<lv_obj_t*>(lv_event_get_target(e));
     int32_t value = lv_slider_get_value(slider);
-    state::State().SetPendingBrightnessSave(static_cast<uint8_t>(value));
+    state::State().SetPendingBrightnessSave(static_cast<uint8_t>(value), lv_tick_get());
 }
 
 void OnBackTapped(lv_event_t* e) {

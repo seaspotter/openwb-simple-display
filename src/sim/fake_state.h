@@ -15,6 +15,7 @@ inline void SeedFakeState() {
     global.battery_power_w = 410;
     global.consumer_power_w = 620;
     global.home_consumption_w = 870;
+    global.meter_power_w = 43;
     global.battery_soc_percent = 72;
     state::State().SetGlobalStatus(global);
 
@@ -26,6 +27,7 @@ inline void SeedFakeState() {
     cp0.power_w = 7360;
     std::strncpy(cp0.chargemode, "pv_charging", sizeof(cp0.chargemode) - 1);
     cp0.soc_percent = 58;
+    cp0.range_km = 180;
     std::strncpy(cp0.connected_vehicle_name, "Model 3", sizeof(cp0.connected_vehicle_name) - 1);
     cp0.phases_in_use = 3;
     cp0.evse_current_a = 16;

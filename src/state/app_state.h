@@ -48,12 +48,15 @@ public:
     void SetNetworkReady(bool ready);
     bool IsNetworkReady() const;
 
-    // NVS writes block for long enough to visibly glitch the display if done on the UI
-    // task, which shares a core with rendering. The on-device settings screen sets this
-    // instead of writing to config::Store() directly; the net task (core 0, not involved
-    // in rendering) picks it up and does the actual write.
-    void SetPendingBrightnessSave(uint8_t percent);
-    bool TryTakePendingBrightnessSave(uint8_t* out_percent);
+    // An NVS commit briefly halts *both* cores, not just the one that issued it — ESP32
+    // disables cache access for the other core too while flash is being written, since
+    // both cores fetch instructions through the same flash cache. Moving the write to
+    // the net task doesn't dodge that, so this also debounces: the net task only
+    // actually commits once debounce_ms has passed since the last call with no newer
+    // one superseding it, landing the (still real, but now decoupled) stall well after
+    // the user's finger — and usually attention — has left the slider.
+    void SetPendingBrightnessSave(uint8_t percent, uint32_t now_ms);
+    bool TryTakePendingBrightnessSave(uint32_t now_ms, uint32_t debounce_ms, uint8_t* out_percent);
 
 private:
 #ifdef UNIT_TEST
@@ -71,6 +74,7 @@ private:
     bool network_ready_ = false;
     bool brightness_save_pending_ = false;
     uint8_t pending_brightness_percent_ = 0;
+    uint32_t pending_brightness_set_ms_ = 0;
 };
 
 // Process-wide instance, shared by the net task and the UI task.

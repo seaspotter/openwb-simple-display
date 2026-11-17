@@ -122,6 +122,7 @@ button.secondary {
 .tag-chargepoint { color: var(--chargepoint); }
 .tag-battery { color: var(--battery); }
 .tag-consumer { color: var(--consumer); }
+.tag-home { color: var(--muted); }
 
 #toast {
     position: fixed;

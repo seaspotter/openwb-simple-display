@@ -10,6 +10,7 @@
 #include "ui/theme/theme_colors.h"
 #include "ui/theme/theme_quartz.h"
 #include "ui/widgets/flow_bar.h"
+#include "ui/widgets/format_power.h"
 #include "ui/widgets/gesture_pager.h"
 #include "ui/widgets/status_bar.h"
 #include "ui/wifi_reset_prompt.h"
@@ -21,8 +22,8 @@ constexpr uint32_t kRefreshIntervalMs = 500;
 // Max pool of legend/bar slots each bar can show; how many are actually visible each
 // tick depends on how many categories are currently non-zero (see FilterNonZero).
 constexpr uint8_t kSupplySlots = 3; // PV, grid import, battery discharge
-constexpr uint8_t kDemandSlots = 5; // chargepoints, battery charge, grid export,
-                                     // Verbraucher, Hausverbrauch
+constexpr uint8_t kDemandSlots = 6; // chargepoints, battery charge, grid export,
+                                     // Verbraucher, Hausverbrauch, Zähler
 
 std::vector<lv_obj_t*> g_chargepoint_cards;
 
@@ -44,23 +45,6 @@ struct FlowItem {
     lv_color_t color;
     float magnitude;
 };
-
-// Matches quartz's own web formatting: plain watts below 1000, otherwise kW with a
-// German decimal comma at 2 places.
-void FormatPowerW(float watts, char* out, size_t out_size) {
-    float abs_w = watts < 0 ? -watts : watts;
-    if (abs_w < 1000.0f) {
-        snprintf(out, out_size, "%.0f W", watts);
-        return;
-    }
-    snprintf(out, out_size, "%.2f kW", watts / 1000.0f);
-    for (char* p = out; *p != '\0'; ++p) {
-        if (*p == '.') {
-            *p = ',';
-            break;
-        }
-    }
-}
 
 // Drops near-zero categories entirely rather than showing a "0 W" entry/sliver —
 // e.g. an unconfigured Zähler, or a battery that's neither charging nor discharging.
@@ -182,7 +166,7 @@ void ApplySortedSlots(FlowItem* items, uint8_t active_count, uint8_t max_slots, 
         lv_label_set_text(icon_labels[i], utf8);
         lv_obj_set_style_text_color(icon_labels[i], items[i].color, LV_PART_MAIN);
 
-        FormatPowerW(items[i].magnitude, buf, sizeof(buf));
+        widgets::FormatPowerW(items[i].magnitude, buf, sizeof(buf));
         lv_label_set_text(value_labels[i], buf);
         lv_obj_remove_flag(lv_obj_get_parent(icon_labels[i]), LV_OBJ_FLAG_HIDDEN);
 
@@ -233,6 +217,7 @@ void RefreshTick(lv_timer_t* /*timer*/) {
             {icon::Glyph::kBolt, colors.grid, grid_export_w},
             {icon::Glyph::kDroplet, colors.consumer, global.consumer_power_w},
             {icon::Glyph::kHome, colors.muted, global.home_consumption_w},
+            {icon::Glyph::kGauge, colors.grid, global.meter_power_w},
         };
         FlowItem demand_active[kDemandSlots];
         uint8_t demand_count = FilterNonZero(demand_candidates, kDemandSlots, demand_active);

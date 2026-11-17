@@ -91,22 +91,23 @@ bool AppState::IsNetworkReady() const {
     return copy;
 }
 
-void AppState::SetPendingBrightnessSave(uint8_t percent) {
+void AppState::SetPendingBrightnessSave(uint8_t percent, uint32_t now_ms) {
     LOCK(&lock_);
     pending_brightness_percent_ = percent;
+    pending_brightness_set_ms_ = now_ms;
     brightness_save_pending_ = true;
     UNLOCK(&lock_);
 }
 
-bool AppState::TryTakePendingBrightnessSave(uint8_t* out_percent) {
+bool AppState::TryTakePendingBrightnessSave(uint32_t now_ms, uint32_t debounce_ms, uint8_t* out_percent) {
     LOCK(&lock_);
-    bool had_pending = brightness_save_pending_;
-    if (had_pending) {
+    bool ready = brightness_save_pending_ && (now_ms - pending_brightness_set_ms_ >= debounce_ms);
+    if (ready) {
         *out_percent = pending_brightness_percent_;
         brightness_save_pending_ = false;
     }
     UNLOCK(&lock_);
-    return had_pending;
+    return ready;
 }
 
 bool AppState::AnyChargepointCharging() const {

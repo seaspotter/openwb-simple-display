@@ -19,6 +19,7 @@ struct ChargepointStatus {
     char chargemode[24] = ""; // "instant_charging" | "pv_charging" | "eco_charging" |
                                // "scheduled_charging" | "stop"
     float soc_percent = -1;   // -1 = unknown
+    float range_km = -1;      // "Reichweite"; -1 = unknown
     char connected_vehicle_name[48] = "";
 
     uint8_t phases_in_use = 0;
@@ -40,6 +41,9 @@ struct GlobalStatus {
     float battery_soc_percent = -1;   // -1 = no battery configured
     float consumer_power_w = 0;       // "Verbraucher" (other switchable consumer devices)
     float home_consumption_w = 0;     // "Hausverbrauch" (unmeasured household base load)
+    float meter_power_w = 0;          // "Zähler" — sum of any extra sub-meters beyond the
+                                       // grid root, auto-discovered via openWB's own
+                                       // counter hierarchy topic (see openwb_mqtt.cpp)
 
     uint32_t last_update_ms = 0;
 };

@@ -8,6 +8,7 @@
 #include "ui/theme/theme_colors.h"
 #include "ui/theme/theme_quartz.h"
 #include "ui/ui_events.h"
+#include "ui/widgets/format_power.h"
 #include "ui/widgets/layout_helpers.h"
 #include "ui/widgets/mode_switch.h"
 
@@ -145,7 +146,7 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     widgets->lock_icon_label =
         widgets::CreateIconLabel(header_right, icon::Glyph::kLockOpen, colors.muted, &font_icons_24);
     lv_obj_add_flag(widgets->lock_icon_label, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_style_pad_all(widgets->lock_icon_label, 10, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(widgets->lock_icon_label, 6, LV_PART_MAIN);
     lv_obj_set_style_radius(widgets->lock_icon_label, LV_RADIUS_CIRCLE, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(widgets->lock_icon_label, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_bg_color(widgets->lock_icon_label, colors.bg, LV_PART_MAIN);
@@ -224,7 +225,7 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     lv_label_set_text(lv_label_create(plus_btn), "+");
     lv_obj_add_event_cb(plus_btn, OnCurrentStep, LV_EVENT_CLICKED, widgets);
 
-    // Stats: Leistung (+ phases badge), Strom, Geladen.
+    // Stats: Leistung, Strom, Phasen, Geladen.
     lv_obj_t* stats_row = lv_obj_create(card);
     lv_obj_set_style_bg_opa(stats_row, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(stats_row, 0, LV_PART_MAIN);
@@ -235,19 +236,19 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     lv_obj_remove_flag(stats_row, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t* power_col = CreateStatColumn(stats_row, "Leistung");
-    lv_obj_t* power_value_row = widgets::CreateGroupRow(power_col, LV_FLEX_ALIGN_START);
-    widgets->stat_power_label = lv_label_create(power_value_row);
+    widgets->stat_power_label = lv_label_create(power_col);
     lv_obj_set_style_text_font(widgets->stat_power_label, &font_sans_14, LV_PART_MAIN);
     lv_label_set_text(widgets->stat_power_label, "0 W");
-    widgets->stat_phases_label = lv_label_create(power_value_row);
-    lv_obj_set_style_text_font(widgets->stat_phases_label, &font_sans_11, LV_PART_MAIN);
-    lv_label_set_text(widgets->stat_phases_label, "");
-    ApplyBadgeStyle(widgets->stat_phases_label, colors.chargepoint, /*tinted=*/true);
 
     lv_obj_t* current_col = CreateStatColumn(stats_row, "Strom");
     widgets->stat_current_label = lv_label_create(current_col);
     lv_obj_set_style_text_font(widgets->stat_current_label, &font_sans_14, LV_PART_MAIN);
     lv_label_set_text(widgets->stat_current_label, "0 A");
+
+    lv_obj_t* phases_col = CreateStatColumn(stats_row, "Phasen");
+    widgets->stat_phases_label = lv_label_create(phases_col);
+    lv_obj_set_style_text_font(widgets->stat_phases_label, &font_sans_14, LV_PART_MAIN);
+    lv_label_set_text(widgets->stat_phases_label, "-");
 
     lv_obj_t* charged_col = CreateStatColumn(stats_row, "Geladen");
     widgets->stat_charged_label = lv_label_create(charged_col);
@@ -267,7 +268,7 @@ void RefreshChargepointCard(lv_obj_t* card, const openwb::ChargepointStatus& sta
     lv_label_set_text(widgets->state_label, state);
     const theme::Palette& colors = theme::Colors(config::Store().Get().dark_mode);
     if (status.charging) {
-        ApplyBadgeStyle(widgets->state_label, colors.chargepoint, /*tinted=*/true);
+        ApplyBadgeStyle(widgets->state_label, colors.pv, /*tinted=*/true);
     } else if (status.plugged) {
         ApplyBadgeStyle(widgets->state_label, colors.battery, /*tinted=*/true);
     } else {
@@ -286,18 +287,21 @@ void RefreshChargepointCard(lv_obj_t* card, const openwb::ChargepointStatus& sta
     } else {
         lv_label_set_text(widgets->vehicle_name_label, "Kein Fahrzeug bekannt");
     }
-    if (status.soc_percent >= 0) {
+    if (status.soc_percent >= 0 && status.range_km >= 0) {
+        lv_label_set_text_fmt(widgets->soc_label, "%.0f%% · +%.0f km", status.soc_percent, status.range_km);
+    } else if (status.soc_percent >= 0) {
         lv_label_set_text_fmt(widgets->soc_label, "%.0f%%", status.soc_percent);
     } else {
         lv_label_set_text(widgets->soc_label, "");
     }
 
-    lv_label_set_text_fmt(widgets->stat_power_label, "%.0f W", status.power_w);
+    char power_buf[24];
+    widgets::FormatPowerW(status.power_w, power_buf, sizeof(power_buf));
+    lv_label_set_text(widgets->stat_power_label, power_buf);
     if (status.phases_in_use > 0) {
         lv_label_set_text_fmt(widgets->stat_phases_label, "%u~", status.phases_in_use);
-        lv_obj_remove_flag(widgets->stat_phases_label, LV_OBJ_FLAG_HIDDEN);
     } else {
-        lv_obj_add_flag(widgets->stat_phases_label, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(widgets->stat_phases_label, "-");
     }
     lv_label_set_text_fmt(widgets->stat_current_label, "%.0f A", status.evse_current_a);
     lv_label_set_text_fmt(widgets->stat_charged_label, "%.1f kWh", status.energy_charged_wh / 1000.0f);

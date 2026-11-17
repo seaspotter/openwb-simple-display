@@ -25,6 +25,7 @@ enum class Glyph : uint32_t {
     kBattery = 0xEA34, // battery
     kHome = 0xEAC1,    // Hausverbrauch (home base load)
     kDroplet = 0xEA97, // Verbraucher (other consumers)
+    kGauge = 0xEAB1,   // Zähler (auto-discovered extra sub-meter(s))
     kLock = 0xEAE2,
     kLockOpen = 0xEAE1,
     kSettings = 0xEB20,
