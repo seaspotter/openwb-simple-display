@@ -29,6 +29,17 @@ struct ChargepointStatus {
     char name[48] = "";          // the chargepoint's own name, not the vehicle's
     float energy_charged_wh = 0; // "Geladen" — MQTT-only, not in simpleAPI
 
+    // Per-mode settings editable from the settings popup — see
+    // https://wiki.openwb.de/doku.php?id=openwb:vc:2.3.x:simpleapi#schreiboperationen_set-topics
+    char instant_limit_type[8] = "none"; // "none" | "soc" | "amount"
+    float instant_limit_soc = 0;         // percent, 0-100
+    float instant_limit_amount_kwh = 0;  // kWh, 1-50
+    char pv_limit_type[8] = "none";      // "none" | "soc" | "amount"
+    float pv_limit_soc = 0;
+    float pv_limit_amount_kwh = 0;
+    float max_price_eco_ct = 0; // ct/kWh — openWB reports this in ct, but the write topic
+                                 // expects EUR (so ÷100 on write; see SetMaxPriceEcoCt)
+
     uint32_t last_update_ms = 0;
 };
 

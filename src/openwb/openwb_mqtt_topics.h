@@ -51,6 +51,20 @@ inline bool ParseChargepointField(const char* suffix, const char* payload, Charg
         out.locked = ParseBool(payload);
     } else if (strcmp(suffix, "config/name") == 0) {
         CopyString(out.name, sizeof(out.name), payload);
+    } else if (strcmp(suffix, "instant_charging_limit") == 0) {
+        CopyString(out.instant_limit_type, sizeof(out.instant_limit_type), payload);
+    } else if (strcmp(suffix, "instant_charging_limit_soc") == 0) {
+        out.instant_limit_soc = static_cast<float>(atof(payload));
+    } else if (strcmp(suffix, "instant_charging_limit_amount") == 0) {
+        out.instant_limit_amount_kwh = static_cast<float>(atof(payload));
+    } else if (strcmp(suffix, "pv_charging_limit") == 0) {
+        CopyString(out.pv_limit_type, sizeof(out.pv_limit_type), payload);
+    } else if (strcmp(suffix, "pv_charging_limit_soc") == 0) {
+        out.pv_limit_soc = static_cast<float>(atof(payload));
+    } else if (strcmp(suffix, "pv_charging_limit_amount") == 0) {
+        out.pv_limit_amount_kwh = static_cast<float>(atof(payload));
+    } else if (strcmp(suffix, "max_price_eco") == 0) {
+        out.max_price_eco_ct = static_cast<float>(atof(payload));
     } else {
         return false;
     }

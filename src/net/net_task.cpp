@@ -43,6 +43,27 @@ state::CommandResult ExecuteCommand(const CommandRequest& req) {
         case CommandType::kSetChargepointLock:
             openwb::mqtt::SetChargepointLock(req.chargepoint_id, req.locked);
             break;
+        case CommandType::kSetInstantLimitType:
+            openwb::mqtt::SetInstantLimitType(req.chargepoint_id, req.limit_type);
+            break;
+        case CommandType::kSetInstantLimitSoc:
+            openwb::mqtt::SetInstantLimitSoc(req.chargepoint_id, req.value);
+            break;
+        case CommandType::kSetInstantLimitAmount:
+            openwb::mqtt::SetInstantLimitAmount(req.chargepoint_id, req.value);
+            break;
+        case CommandType::kSetPvLimitType:
+            openwb::mqtt::SetPvLimitType(req.chargepoint_id, req.limit_type);
+            break;
+        case CommandType::kSetPvLimitSoc:
+            openwb::mqtt::SetPvLimitSoc(req.chargepoint_id, req.value);
+            break;
+        case CommandType::kSetPvLimitAmount:
+            openwb::mqtt::SetPvLimitAmount(req.chargepoint_id, req.value);
+            break;
+        case CommandType::kSetMaxPriceEco:
+            openwb::mqtt::SetMaxPriceEcoCt(req.chargepoint_id, req.value);
+            break;
     }
     result.success = true;
     return result;

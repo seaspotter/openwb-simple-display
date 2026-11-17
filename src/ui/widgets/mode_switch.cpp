@@ -9,7 +9,7 @@
 namespace widgets {
 namespace {
 
-constexpr const char* kButtonMap[] = {"Sofort", "PV", "Ziel", "Eco", "Stopp", ""};
+constexpr const char* kButtonMap[] = {"Sofort", "PV", "Ziel", "Eco", "Stop", ""};
 // Generous margin above the slowest observed MQTT round-trip through openWB's own
 // control loop (confirmed up to ~5s) — long enough that a real echo always arrives
 // well before this, but short enough that a lost/dropped command doesn't leave the

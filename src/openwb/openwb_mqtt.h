@@ -24,5 +24,17 @@ void SetChargemode(uint8_t chargepoint_id, ChargeMode mode);
 void SetChargecurrent(uint8_t chargepoint_id, float amps);
 void SetChargepointLock(uint8_t chargepoint_id, bool locked);
 
+// Per-mode settings popup — type is "none" | "soc" | "amount"; soc is 0-100 (percent),
+// amount is 1-50 (kWh). See
+// https://wiki.openwb.de/doku.php?id=openwb:vc:2.3.x:simpleapi#schreiboperationen_set-topics
+void SetInstantLimitType(uint8_t chargepoint_id, const char* type);
+void SetInstantLimitSoc(uint8_t chargepoint_id, float soc_percent);
+void SetInstantLimitAmount(uint8_t chargepoint_id, float amount_kwh);
+void SetPvLimitType(uint8_t chargepoint_id, const char* type);
+void SetPvLimitSoc(uint8_t chargepoint_id, float soc_percent);
+void SetPvLimitAmount(uint8_t chargepoint_id, float amount_kwh);
+// openWB reports max_price_eco in ct/kWh but the write topic expects EUR/kWh.
+void SetMaxPriceEcoCt(uint8_t chargepoint_id, float price_ct);
+
 } // namespace mqtt
 } // namespace openwb

@@ -13,7 +13,18 @@ namespace net {
 void Init();
 
 // A touch-triggered control action, queued by ui_events.cpp and executed on the net task.
-enum class CommandType { kSetChargemode, kSetChargecurrent, kSetChargepointLock };
+enum class CommandType {
+    kSetChargemode,
+    kSetChargecurrent,
+    kSetChargepointLock,
+    kSetInstantLimitType,
+    kSetInstantLimitSoc,
+    kSetInstantLimitAmount,
+    kSetPvLimitType,
+    kSetPvLimitSoc,
+    kSetPvLimitAmount,
+    kSetMaxPriceEco,
+};
 
 struct CommandRequest {
     CommandType type;
@@ -21,6 +32,8 @@ struct CommandRequest {
     openwb::ChargeMode mode; // kSetChargemode
     float amps;              // kSetChargecurrent
     bool locked;             // kSetChargepointLock
+    char limit_type[8];      // kSetInstantLimitType, kSetPvLimitType: "none"|"soc"|"amount"
+    float value;             // kSet*LimitSoc/Amount (percent/kWh), kSetMaxPriceEco (ct)
 };
 
 // Non-blocking; false if the internal queue is full.

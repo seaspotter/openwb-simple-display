@@ -47,7 +47,28 @@ void test_config_name_maps_to_the_name_field() {
 
 void test_unrecognized_suffix_returns_false() {
     ChargepointStatus status{};
-    TEST_ASSERT_FALSE(ParseChargepointField("max_price_eco", "25.17", status));
+    TEST_ASSERT_FALSE(ParseChargepointField("totally_unknown_field", "25.17", status));
+}
+
+// Settings-popup fields — see
+// https://wiki.openwb.de/doku.php?id=openwb:vc:2.3.x:simpleapi#schreiboperationen_set-topics
+void test_instant_and_pv_limit_fields_parse_independently() {
+    ChargepointStatus status{};
+    TEST_ASSERT_TRUE(ParseChargepointField("instant_charging_limit", "soc", status));
+    TEST_ASSERT_TRUE(ParseChargepointField("instant_charging_limit_soc", "80", status));
+    TEST_ASSERT_TRUE(ParseChargepointField("pv_charging_limit", "amount", status));
+    TEST_ASSERT_TRUE(ParseChargepointField("pv_charging_limit_amount", "20", status));
+
+    TEST_ASSERT_EQUAL_STRING("soc", status.instant_limit_type);
+    TEST_ASSERT_EQUAL_FLOAT(80.0f, status.instant_limit_soc);
+    TEST_ASSERT_EQUAL_STRING("amount", status.pv_limit_type);
+    TEST_ASSERT_EQUAL_FLOAT(20.0f, status.pv_limit_amount_kwh);
+}
+
+void test_max_price_eco_parses_as_the_ct_value_openwb_reports() {
+    ChargepointStatus status{};
+    TEST_ASSERT_TRUE(ParseChargepointField("max_price_eco", "25.17", status));
+    TEST_ASSERT_EQUAL_FLOAT(25.17f, status.max_price_eco_ct);
 }
 
 // openWB/chargepoint/<id>/set/log is the one topic with a JSON payload, not a scalar.
@@ -91,6 +112,8 @@ int main(int /*argc*/, char** /*argv*/) {
     RUN_TEST(test_nested_soc_suffix_is_matched_exactly);
     RUN_TEST(test_config_name_maps_to_the_name_field);
     RUN_TEST(test_unrecognized_suffix_returns_false);
+    RUN_TEST(test_instant_and_pv_limit_fields_parse_independently);
+    RUN_TEST(test_max_price_eco_parses_as_the_ct_value_openwb_reports);
     RUN_TEST(test_log_payload_extracts_imported_since_plugged);
     RUN_TEST(test_log_payload_missing_field_defaults_to_zero);
     RUN_TEST(test_pv_power_is_negated_from_the_raw_topic_sign);

@@ -159,24 +159,59 @@ void HandleLogMessage(uint8_t id, const char* payload) {
 }
 
 // Read-only: openWB/chargepoint/<id>/set/charge_template is what simpleAPI_mqtt.py itself
-// writes to when it applies an external chargemode command — reading chargemode.selected
-// from here directly mirrors in milliseconds (confirmed live: ~5ms), instead of waiting
-// for openWB's own control loop to next reconcile and update the simpleAPI GET-mirror
-// topic (confirmed up to 3+ seconds). We never publish to this topic ourselves — doing a
-// read-merge-write against the full blob from this device would risk corrupting
-// unrelated settings (time_charging plans, other modes' parameters, etc.) if anything
-// failed to round-trip exactly.
+// writes to when it applies an external command — reading from here directly mirrors in
+// milliseconds (confirmed live: ~5ms for chargemode), instead of waiting for openWB's own
+// control loop to next reconcile the simpleAPI GET-mirror topics (confirmed 3+ seconds
+// behind, twice, for chargemode). Same applies to every per-mode setting nested in this
+// same blob, so all of them are extracted here too for the settings popup. We never
+// publish to this topic ourselves — doing a read-merge-write against the full blob from
+// this device would risk corrupting unrelated settings (time_charging plans, other
+// modes' parameters, etc.) if anything failed to round-trip exactly; writes stay on
+// simpleAPI (openwb_mqtt.h's SetInstantLimit*/SetPvLimit*/SetMaxPriceEcoCt).
 void HandleChargeTemplateMessage(uint8_t id, const char* payload) {
     int slot = SlotForChargepointId(id);
     if (slot < 0) return;
 
     JsonDocument doc;
     if (deserializeJson(doc, payload) != DeserializationError::Ok) return;
-    const char* selected = doc["chargemode"]["selected"] | "";
-    if (selected[0] == '\0') return;
+    JsonObject chargemode = doc["chargemode"].as<JsonObject>();
+    if (chargemode.isNull()) return;
 
     openwb::ChargepointStatus status = state::State().GetChargepointStatus(static_cast<uint8_t>(slot));
-    strlcpy(status.chargemode, selected, sizeof(status.chargemode));
+
+    const char* selected = chargemode["selected"] | "";
+    if (selected[0] != '\0') strlcpy(status.chargemode, selected, sizeof(status.chargemode));
+
+    JsonObject instant = chargemode["instant_charging"].as<JsonObject>();
+    if (!instant.isNull()) {
+        const char* limit_type = instant["limit"]["selected"] | "";
+        if (limit_type[0] != '\0') {
+            strlcpy(status.instant_limit_type, limit_type, sizeof(status.instant_limit_type));
+        }
+        status.instant_limit_soc = instant["limit"]["soc"] | status.instant_limit_soc;
+        // charge_template stores the amount in Wh; the popup and the simpleAPI write
+        // topic both work in kWh.
+        float amount_wh = instant["limit"]["amount"] | (status.instant_limit_amount_kwh * 1000.0f);
+        status.instant_limit_amount_kwh = amount_wh / 1000.0f;
+    }
+
+    JsonObject pv = chargemode["pv_charging"].as<JsonObject>();
+    if (!pv.isNull()) {
+        const char* limit_type = pv["limit"]["selected"] | "";
+        if (limit_type[0] != '\0') strlcpy(status.pv_limit_type, limit_type, sizeof(status.pv_limit_type));
+        status.pv_limit_soc = pv["limit"]["soc"] | status.pv_limit_soc;
+        float amount_wh = pv["limit"]["amount"] | (status.pv_limit_amount_kwh * 1000.0f);
+        status.pv_limit_amount_kwh = amount_wh / 1000.0f;
+    }
+
+    JsonObject eco = chargemode["eco_charging"].as<JsonObject>();
+    if (!eco.isNull()) {
+        // charge_template stores this in EUR/Wh; openWB's own GET mirror (and our popup)
+        // use ct/kWh — confirmed live: 0.0002517 EUR/Wh == 25.17 ct/kWh, a factor of 100000.
+        float price_eur_per_wh = eco["max_price"] | (status.max_price_eco_ct / 100000.0f);
+        status.max_price_eco_ct = price_eur_per_wh * 100000.0f;
+    }
+
     status.valid = true;
     status.last_update_ms = millis();
     state::State().SetChargepointStatus(static_cast<uint8_t>(slot), status);
@@ -327,6 +362,44 @@ void SetChargecurrent(uint8_t chargepoint_id, float amps) {
 
 void SetChargepointLock(uint8_t chargepoint_id, bool locked) {
     Publish(chargepoint_id, "chargepoint_lock", locked ? "true" : "false");
+}
+
+void SetInstantLimitType(uint8_t chargepoint_id, const char* type) {
+    Publish(chargepoint_id, "instant_charging_limit", type);
+}
+
+void SetInstantLimitSoc(uint8_t chargepoint_id, float soc_percent) {
+    char value[8];
+    snprintf(value, sizeof(value), "%d", static_cast<int>(soc_percent));
+    Publish(chargepoint_id, "instant_charging_limit_soc", value);
+}
+
+void SetInstantLimitAmount(uint8_t chargepoint_id, float amount_kwh) {
+    char value[8];
+    snprintf(value, sizeof(value), "%d", static_cast<int>(amount_kwh));
+    Publish(chargepoint_id, "instant_charging_limit_amount", value);
+}
+
+void SetPvLimitType(uint8_t chargepoint_id, const char* type) {
+    Publish(chargepoint_id, "pv_charging_limit", type);
+}
+
+void SetPvLimitSoc(uint8_t chargepoint_id, float soc_percent) {
+    char value[8];
+    snprintf(value, sizeof(value), "%d", static_cast<int>(soc_percent));
+    Publish(chargepoint_id, "pv_charging_limit_soc", value);
+}
+
+void SetPvLimitAmount(uint8_t chargepoint_id, float amount_kwh) {
+    char value[8];
+    snprintf(value, sizeof(value), "%d", static_cast<int>(amount_kwh));
+    Publish(chargepoint_id, "pv_charging_limit_amount", value);
+}
+
+void SetMaxPriceEcoCt(uint8_t chargepoint_id, float price_ct) {
+    char value[16];
+    snprintf(value, sizeof(value), "%.4f", price_ct / 100.0f); // ct -> EUR
+    Publish(chargepoint_id, "max_price_eco", value);
 }
 
 } // namespace mqtt
