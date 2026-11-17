@@ -36,7 +36,9 @@ struct ChargepointCardWidgets {
     lv_obj_t* stat_phases_label;
     lv_obj_t* stat_current_label;
     lv_obj_t* stat_charged_label;
-    lv_obj_t* stat_goal_label; // "Ziel" — the active Ladebegrenzung's target value, if any
+    lv_obj_t* goal_col;        // "Ziel" column; hidden entirely when there's no limit
+    lv_obj_t* stat_goal_label; // the active Ladebegrenzung's target value
+    lv_obj_t* range_col; // hidden unless charging with a known positive range
     lv_obj_t* stat_range_label;
 
     bool locked = false;
@@ -537,17 +539,19 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     lv_obj_set_style_text_font(widgets->stat_charged_label, &font_sans_14, LV_PART_MAIN);
     lv_label_set_text(widgets->stat_charged_label, "0,0 kWh");
 
-    lv_obj_t* goal_col = CreateStatColumn(stats_row, "Ziel");
-    lv_obj_t* goal_value_row = widgets::CreateGroupRow(goal_col, LV_FLEX_ALIGN_START, 4);
+    widgets->goal_col = CreateStatColumn(stats_row, "Ziel");
+    lv_obj_t* goal_value_row = widgets::CreateGroupRow(widgets->goal_col, LV_FLEX_ALIGN_START, 4);
     widgets::CreateIconLabel(goal_value_row, icon::Glyph::kGoal, colors.muted);
     widgets->stat_goal_label = lv_label_create(goal_value_row);
     lv_obj_set_style_text_font(widgets->stat_goal_label, &font_sans_14, LV_PART_MAIN);
     lv_label_set_text(widgets->stat_goal_label, "-");
+    lv_obj_add_flag(widgets->goal_col, LV_OBJ_FLAG_HIDDEN);
 
-    lv_obj_t* range_col = CreateStatColumn(stats_row, "Reichweite");
-    widgets->stat_range_label = lv_label_create(range_col);
+    widgets->range_col = CreateStatColumn(stats_row, "Reichweite");
+    widgets->stat_range_label = lv_label_create(widgets->range_col);
     lv_obj_set_style_text_font(widgets->stat_range_label, &font_sans_14, LV_PART_MAIN);
     lv_label_set_text(widgets->stat_range_label, "-");
+    lv_obj_add_flag(widgets->range_col, LV_OBJ_FLAG_HIDDEN);
 
     return card;
 }
@@ -603,10 +607,11 @@ void RefreshChargepointCard(lv_obj_t* card, const openwb::ChargepointStatus& sta
     }
     lv_label_set_text_fmt(widgets->stat_current_label, "%.0f A", status.evse_current_a);
     lv_label_set_text_fmt(widgets->stat_charged_label, "%.1f kWh", status.energy_charged_wh / 1000.0f);
-    if (status.range_km >= 0) {
+    if (status.charging && status.range_km > 0) {
         lv_label_set_text_fmt(widgets->stat_range_label, "+%.0f km", status.range_km);
+        lv_obj_remove_flag(widgets->range_col, LV_OBJ_FLAG_HIDDEN);
     } else {
-        lv_label_set_text(widgets->stat_range_label, "-");
+        lv_obj_add_flag(widgets->range_col, LV_OBJ_FLAG_HIDDEN);
     }
 
     openwb::ChargeMode mode = openwb::ChargeMode::kStop;
@@ -646,12 +651,14 @@ void RefreshChargepointCard(lv_obj_t* card, const openwb::ChargepointStatus& sta
     if (mode_known && strcmp(limit_type, "soc") == 0) {
         float soc = mode == openwb::ChargeMode::kInstant ? status.instant_limit_soc : status.pv_limit_soc;
         lv_label_set_text_fmt(widgets->stat_goal_label, "%.0f %%", soc);
+        lv_obj_remove_flag(widgets->goal_col, LV_OBJ_FLAG_HIDDEN);
     } else if (mode_known && strcmp(limit_type, "amount") == 0) {
         float amount =
             mode == openwb::ChargeMode::kInstant ? status.instant_limit_amount_kwh : status.pv_limit_amount_kwh;
         lv_label_set_text_fmt(widgets->stat_goal_label, "%.0f kWh", amount);
+        lv_obj_remove_flag(widgets->goal_col, LV_OBJ_FLAG_HIDDEN);
     } else {
-        lv_label_set_text(widgets->stat_goal_label, "-");
+        lv_obj_add_flag(widgets->goal_col, LV_OBJ_FLAG_HIDDEN);
     }
 }
 
