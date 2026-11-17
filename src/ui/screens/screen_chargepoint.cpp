@@ -30,19 +30,15 @@ struct ChargepointCardWidgets {
     lv_obj_t* soc_label;
 
     lv_obj_t* mode_switch;
-    // Icon + value for the active Ladebegrenzung on whichever of Sofort/PV is selected;
-    // the row is hidden entirely when there's no limit.
-    lv_obj_t* limit_indicator_row;
-    lv_obj_t* limit_indicator_label;
-    lv_obj_t* current_value_label;   // lives inside the settings popup, created on demand
+    float instant_current_a = 0; // cached "Ladestrom" target, read by OnSettingsTapped
 
     lv_obj_t* stat_power_label;
     lv_obj_t* stat_phases_label;
     lv_obj_t* stat_current_label;
     lv_obj_t* stat_charged_label;
+    lv_obj_t* stat_goal_label; // "Ziel" — the active Ladebegrenzung's target value, if any
     lv_obj_t* stat_range_label;
 
-    float current_amps = kCurrentMinAmps;
     bool locked = false;
     openwb::ChargeMode current_mode = openwb::ChargeMode::kStop;
 
@@ -60,17 +56,27 @@ ChargepointCardWidgets* WidgetsOf(lv_obj_t* card) {
     return static_cast<ChargepointCardWidgets*>(lv_obj_get_user_data(card));
 }
 
+// Fresh per-popup-open state, same lifetime pattern as LimitEditorState — seeded from
+// the latest known real value every time the popup is opened, rather than a long-lived
+// field on ChargepointCardWidgets that only ever reflected local taps and never the
+// actual configured current (e.g. set from the browser).
+struct CurrentEditorState {
+    uint8_t chargepoint_id;
+    float current_a;
+    lv_obj_t* value_label;
+};
+
 void OnCurrentStep(lv_event_t* e) {
-    auto* widgets = static_cast<ChargepointCardWidgets*>(lv_event_get_user_data(e));
+    auto* state = static_cast<CurrentEditorState*>(lv_event_get_user_data(e));
     lv_obj_t* btn = static_cast<lv_obj_t*>(lv_event_get_target(e));
     intptr_t direction = reinterpret_cast<intptr_t>(lv_obj_get_user_data(btn));
 
-    widgets->current_amps += static_cast<float>(direction) * kCurrentStepAmps;
-    if (widgets->current_amps < kCurrentMinAmps) widgets->current_amps = kCurrentMinAmps;
-    if (widgets->current_amps > kCurrentMaxAmps) widgets->current_amps = kCurrentMaxAmps;
+    state->current_a += static_cast<float>(direction) * kCurrentStepAmps;
+    if (state->current_a < kCurrentMinAmps) state->current_a = kCurrentMinAmps;
+    if (state->current_a > kCurrentMaxAmps) state->current_a = kCurrentMaxAmps;
 
-    lv_label_set_text_fmt(widgets->current_value_label, "%.0f A", widgets->current_amps);
-    ui::RequestChargecurrentDebounced(widgets->chargepoint_id, widgets->current_amps);
+    lv_label_set_text_fmt(state->value_label, "%.0f A", state->current_a);
+    ui::RequestChargecurrentDebounced(state->chargepoint_id, state->current_a);
 }
 
 // Pill badge matching quartz's .badge style.
@@ -354,6 +360,10 @@ void OnSettingsTapped(lv_event_t* e) {
     auto* widgets = static_cast<ChargepointCardWidgets*>(lv_event_get_user_data(e));
 
     lv_obj_t* mbox = lv_msgbox_create(nullptr);
+    // Default msgbox width is comfortably narrower than the screen; wide enough content
+    // (the Ladebegrenzung selector's three buttons, the four-button price stepper) was
+    // shifting/clipping inside it instead of the box growing to fit.
+    lv_obj_set_width(mbox, lv_pct(92));
     lv_obj_t* title = lv_msgbox_add_title(mbox, ModeTitle(widgets->current_mode));
     theme::ApplyMsgboxFont(title);
     lv_msgbox_add_close_button(mbox);
@@ -361,11 +371,13 @@ void OnSettingsTapped(lv_event_t* e) {
 
     switch (widgets->current_mode) {
         case openwb::ChargeMode::kInstant: {
+            auto* current_state =
+                new CurrentEditorState{widgets->chargepoint_id, widgets->instant_current_a, nullptr};
             CreateSettingLabel(content, "Ladestrom");
             lv_obj_t* current_row =
-                CreateStepperRow(content, OnCurrentStep, widgets, &widgets->current_value_label);
+                CreateStepperRow(content, OnCurrentStep, current_state, &current_state->value_label);
             lv_obj_set_style_pad_bottom(current_row, 8, LV_PART_MAIN);
-            lv_label_set_text_fmt(widgets->current_value_label, "%.0f A", widgets->current_amps);
+            lv_label_set_text_fmt(current_state->value_label, "%.0f A", current_state->current_a);
 
             CreateLimitEditor(content, widgets->chargepoint_id, /*is_pv=*/false, widgets->instant_limit_type,
                                widgets->instant_limit_soc, widgets->instant_limit_amount_kwh);
@@ -495,15 +507,7 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
 
     widgets->mode_switch = widgets::CreateModeSwitch(card, chargepoint_id);
 
-    widgets->limit_indicator_row = widgets::CreateGroupRow(card, LV_FLEX_ALIGN_START);
-    widgets::CreateIconLabel(widgets->limit_indicator_row, icon::Glyph::kGauge, colors.muted);
-    widgets->limit_indicator_label = lv_label_create(widgets->limit_indicator_row);
-    lv_obj_set_style_text_font(widgets->limit_indicator_label, &font_sans_11, LV_PART_MAIN);
-    lv_obj_set_style_text_color(widgets->limit_indicator_label, colors.muted, LV_PART_MAIN);
-    lv_label_set_text(widgets->limit_indicator_label, "");
-    lv_obj_add_flag(widgets->limit_indicator_row, LV_OBJ_FLAG_HIDDEN);
-
-    // Stats: Leistung, Phasen, Strom, Geladen, Reichweite.
+    // Stats: Leistung, Phasen, Strom, Geladen, Ziel, Reichweite.
     lv_obj_t* stats_row = lv_obj_create(card);
     lv_obj_set_style_bg_opa(stats_row, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(stats_row, 0, LV_PART_MAIN);
@@ -532,6 +536,13 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     widgets->stat_charged_label = lv_label_create(charged_col);
     lv_obj_set_style_text_font(widgets->stat_charged_label, &font_sans_14, LV_PART_MAIN);
     lv_label_set_text(widgets->stat_charged_label, "0,0 kWh");
+
+    lv_obj_t* goal_col = CreateStatColumn(stats_row, "Ziel");
+    lv_obj_t* goal_value_row = widgets::CreateGroupRow(goal_col, LV_FLEX_ALIGN_START, 4);
+    widgets::CreateIconLabel(goal_value_row, icon::Glyph::kGoal, colors.muted);
+    widgets->stat_goal_label = lv_label_create(goal_value_row);
+    lv_obj_set_style_text_font(widgets->stat_goal_label, &font_sans_14, LV_PART_MAIN);
+    lv_label_set_text(widgets->stat_goal_label, "-");
 
     lv_obj_t* range_col = CreateStatColumn(stats_row, "Reichweite");
     widgets->stat_range_label = lv_label_create(range_col);
@@ -627,20 +638,20 @@ void RefreshChargepointCard(lv_obj_t* card, const openwb::ChargepointStatus& sta
         widgets::SetSelectedMode(widgets->mode_switch, mode);
     }
 
+    widgets->instant_current_a = status.instant_current_a;
+
     const char* limit_type = mode == openwb::ChargeMode::kInstant   ? status.instant_limit_type
                               : mode == openwb::ChargeMode::kPv     ? status.pv_limit_type
                                                                      : "none";
     if (mode_known && strcmp(limit_type, "soc") == 0) {
         float soc = mode == openwb::ChargeMode::kInstant ? status.instant_limit_soc : status.pv_limit_soc;
-        lv_label_set_text_fmt(widgets->limit_indicator_label, "bis %.0f %% SoC", soc);
-        lv_obj_remove_flag(widgets->limit_indicator_row, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text_fmt(widgets->stat_goal_label, "%.0f %%", soc);
     } else if (mode_known && strcmp(limit_type, "amount") == 0) {
         float amount =
             mode == openwb::ChargeMode::kInstant ? status.instant_limit_amount_kwh : status.pv_limit_amount_kwh;
-        lv_label_set_text_fmt(widgets->limit_indicator_label, "bis %.0f kWh", amount);
-        lv_obj_remove_flag(widgets->limit_indicator_row, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text_fmt(widgets->stat_goal_label, "%.0f kWh", amount);
     } else {
-        lv_obj_add_flag(widgets->limit_indicator_row, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(widgets->stat_goal_label, "-");
     }
 }
 

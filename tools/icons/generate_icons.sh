@@ -32,6 +32,7 @@ mkdir -p "${OUT_DIR}"
 #   0xEAC1 home           -> Hausverbrauch (home base load)
 #   0xEA97 droplet        -> Verbraucher (other consumers)
 #   0xEAB1 gauge          -> Zähler (auto-discovered extra sub-meter(s))
+#   0xEB35 target         -> "Ziel" stat column (active Ladebegrenzung target value)
 #   0xEAE1 lock-open      -> chargepoint lock button (unlocked state)
 #   0xEAE2 lock           -> chargepoint lock button (locked state)
 #   0xEB20 settings       -> future settings-gear use
@@ -46,7 +47,7 @@ lv_font_conv \
   --bpp 4 \
   --format lvgl \
   --no-compress \
-  --range 0xEA06,0xEA34,0xEA38,0xEA71,0xEA97,0xEAB1,0xEAC1,0xEAE1,0xEAE2,0xEB20,0xEB30,0xEB52,0xEBBB,0xECFA \
+  --range 0xEA06,0xEA34,0xEA38,0xEA71,0xEA97,0xEAB1,0xEAC1,0xEAE1,0xEAE2,0xEB20,0xEB30,0xEB35,0xEB52,0xEBBB,0xECFA \
   --lv-font-name font_icons_16 \
   -o "${OUT_DIR}/font_icons_16.c"
 echo "generated font_icons_16.c"

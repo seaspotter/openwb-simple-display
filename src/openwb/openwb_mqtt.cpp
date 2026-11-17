@@ -184,6 +184,7 @@ void HandleChargeTemplateMessage(uint8_t id, const char* payload) {
 
     JsonObject instant = chargemode["instant_charging"].as<JsonObject>();
     if (!instant.isNull()) {
+        status.instant_current_a = instant["current"] | status.instant_current_a;
         const char* limit_type = instant["limit"]["selected"] | "";
         if (limit_type[0] != '\0') {
             strlcpy(status.instant_limit_type, limit_type, sizeof(status.instant_limit_type));

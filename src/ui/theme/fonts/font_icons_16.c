@@ -1,7 +1,7 @@
 /*******************************************************************************
  * Size: 16 px
  * Bpp: 4
- * Opts: --font /home/seaspotter/github/openwb-display/tools/icons/source/tabler-icons.ttf --size 16 --bpp 4 --format lvgl --no-compress --range 0xEA06,0xEA34,0xEA38,0xEA71,0xEA97,0xEAB1,0xEAC1,0xEAE1,0xEAE2,0xEB20,0xEB30,0xEB52,0xEBBB,0xECFA --lv-font-name font_icons_16 -o /home/seaspotter/github/openwb-display/tools/icons/../../src/ui/theme/fonts/font_icons_16.c
+ * Opts: --font /home/seaspotter/github/openwb-display/tools/icons/source/tabler-icons.ttf --size 16 --bpp 4 --format lvgl --no-compress --range 0xEA06,0xEA34,0xEA38,0xEA71,0xEA97,0xEAB1,0xEAC1,0xEAE1,0xEAE2,0xEB20,0xEB30,0xEB35,0xEB52,0xEBBB,0xECFA --lv-font-name font_icons_16 -o /home/seaspotter/github/openwb-display/tools/icons/../../src/ui/theme/fonts/font_icons_16.c
  ******************************************************************************/
 
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
@@ -182,6 +182,22 @@ static LV_ATTRIBUTE_LARGE_CONST const uint8_t glyph_bitmap[] = {
     0x0, 0x0, 0x0, 0x0, 0x0, 0x11, 0x0, 0x0,
     0x0,
 
+    /* U+EB35 "" */
+    0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+    0x1, 0x8d, 0xff, 0xd8, 0x10, 0x0, 0x0, 0x4f,
+    0xe8, 0x55, 0x8e, 0xf4, 0x0, 0x3, 0xfa, 0x1,
+    0x55, 0x10, 0xaf, 0x30, 0xd, 0xb0, 0x7f, 0xff,
+    0xf7, 0xb, 0xd0, 0x4f, 0x25, 0xf6, 0x0, 0x7f,
+    0x62, 0xf4, 0x8d, 0xd, 0x90, 0x98, 0xa, 0xd0,
+    0xd8, 0x9b, 0xf, 0x54, 0xff, 0x46, 0xf0, 0xb9,
+    0x9c, 0xd, 0x81, 0xcc, 0x8, 0xd0, 0xc9, 0x5f,
+    0x17, 0xf4, 0x0, 0x3f, 0x71, 0xf5, 0xe, 0x90,
+    0xaf, 0xdd, 0xfa, 0x8, 0xe0, 0x5, 0xf6, 0x4,
+    0x88, 0x40, 0x7f, 0x50, 0x0, 0x7f, 0xb4, 0x12,
+    0x5c, 0xf7, 0x0, 0x0, 0x3, 0xbf, 0xff, 0xfc,
+    0x40, 0x0, 0x0, 0x0, 0x0, 0x33, 0x10, 0x0,
+    0x0,
+
     /* U+EB52 "" */
     0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
     0x4, 0xae, 0xff, 0xea, 0x40, 0x0, 0x2, 0xcf,
@@ -241,9 +257,10 @@ static const lv_font_fmt_txt_glyph_dsc_t glyph_dsc[] = {
     {.bitmap_index = 756, .adv_w = 256, .box_w = 12, .box_h = 15, .ofs_x = 2, .ofs_y = -1},
     {.bitmap_index = 846, .adv_w = 256, .box_w = 14, .box_h = 15, .ofs_x = 1, .ofs_y = -1},
     {.bitmap_index = 951, .adv_w = 256, .box_w = 14, .box_h = 15, .ofs_x = 1, .ofs_y = -1},
-    {.bitmap_index = 1056, .adv_w = 256, .box_w = 14, .box_h = 11, .ofs_x = 1, .ofs_y = 1},
-    {.bitmap_index = 1133, .adv_w = 256, .box_w = 14, .box_h = 11, .ofs_x = 1, .ofs_y = 1},
-    {.bitmap_index = 1210, .adv_w = 256, .box_w = 14, .box_h = 15, .ofs_x = 1, .ofs_y = -1}
+    {.bitmap_index = 1056, .adv_w = 256, .box_w = 14, .box_h = 15, .ofs_x = 1, .ofs_y = -1},
+    {.bitmap_index = 1161, .adv_w = 256, .box_w = 14, .box_h = 11, .ofs_x = 1, .ofs_y = 1},
+    {.bitmap_index = 1238, .adv_w = 256, .box_w = 14, .box_h = 11, .ofs_x = 1, .ofs_y = 1},
+    {.bitmap_index = 1315, .adv_w = 256, .box_w = 14, .box_h = 15, .ofs_x = 1, .ofs_y = -1}
 };
 
 /*---------------------
@@ -252,7 +269,7 @@ static const lv_font_fmt_txt_glyph_dsc_t glyph_dsc[] = {
 
 static const uint16_t unicode_list_0[] = {
     0x0, 0x2e, 0x32, 0x6b, 0x91, 0xab, 0xbb, 0xdb,
-    0xdc, 0x11a, 0x12a, 0x14c, 0x1b5, 0x2f4
+    0xdc, 0x11a, 0x12a, 0x12f, 0x14c, 0x1b5, 0x2f4
 };
 
 /*Collect the unicode lists and glyph_id offsets*/
@@ -260,7 +277,7 @@ static const lv_font_fmt_txt_cmap_t cmaps[] =
 {
     {
         .range_start = 59910, .range_length = 757, .glyph_id_start = 1,
-        .unicode_list = unicode_list_0, .glyph_id_ofs_list = NULL, .list_length = 14, .type = LV_FONT_FMT_TXT_CMAP_SPARSE_TINY
+        .unicode_list = unicode_list_0, .glyph_id_ofs_list = NULL, .list_length = 15, .type = LV_FONT_FMT_TXT_CMAP_SPARSE_TINY
     }
 };
 

@@ -31,6 +31,7 @@ struct ChargepointStatus {
 
     // Per-mode settings editable from the settings popup — see
     // https://wiki.openwb.de/doku.php?id=openwb:vc:2.3.x:simpleapi#schreiboperationen_set-topics
+    float instant_current_a = 0;         // "Ladestrom" target for Sofort (amps)
     char instant_limit_type[8] = "none"; // "none" | "soc" | "amount"
     float instant_limit_soc = 0;         // percent, 0-100
     float instant_limit_amount_kwh = 0;  // kWh, 1-50
