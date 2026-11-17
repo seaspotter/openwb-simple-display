@@ -35,6 +35,10 @@ inline void SeedFakeState() {
     cp0.energy_charged_wh = 2400;
     std::strncpy(cp0.pv_limit_type, "soc", sizeof(cp0.pv_limit_type) - 1);
     cp0.pv_limit_soc = 80;
+    std::strncpy(cp0.state_str,
+                 "Fahrzeug lädt. Der aktuelle Strompreis liegt über dem maximalen Strompreis. "
+                 "Lädt mit Überschuss.",
+                 sizeof(cp0.state_str) - 1);
     state::State().SetChargepointStatus(0, cp0);
 
     openwb::ChargepointStatus cp1{};

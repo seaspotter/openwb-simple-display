@@ -246,7 +246,7 @@ void OnLimitSocStep(lv_event_t* e) {
     lv_obj_t* btn = static_cast<lv_obj_t*>(lv_event_get_target(e));
     intptr_t dir = reinterpret_cast<intptr_t>(lv_obj_get_user_data(btn));
 
-    state->soc_value += static_cast<float>(dir) * 5.0f;
+    state->soc_value += static_cast<float>(dir) * 1.0f;
     if (state->soc_value < 0) state->soc_value = 0;
     if (state->soc_value > 100) state->soc_value = 100;
     lv_label_set_text_fmt(state->soc_value_label, "%.0f %%", state->soc_value);
@@ -288,6 +288,13 @@ void OnLimitTypeChanged(lv_event_t* e) {
     strlcpy(req.limit_type, type, sizeof(req.limit_type));
     net::EnqueueCommand(req);
 
+    // VALUE_CHANGED fires on PRESS, but lv_buttonmatrix only flips its own internal
+    // checked bit later, on RELEASE — setting it here too makes the pill move the
+    // instant the tap registers, instead of depending on that separate, later step.
+    lv_buttonmatrix_clear_button_ctrl_all(obj, LV_BUTTONMATRIX_CTRL_CHECKED);
+    lv_buttonmatrix_set_button_ctrl(obj, selected, LV_BUTTONMATRIX_CTRL_CHECKED);
+    lv_obj_invalidate(obj);
+
     lv_obj_add_flag(state->soc_row, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(state->amount_row, LV_OBJ_FLAG_HIDDEN);
     if (selected == 1) lv_obj_remove_flag(state->soc_row, LV_OBJ_FLAG_HIDDEN);
@@ -308,6 +315,10 @@ void CreateLimitEditor(lv_obj_t* parent, uint8_t chargepoint_id, bool is_pv, con
     // for state styling instead. Setting it explicitly here, rather than relying on
     // theme defaults, is what actually makes the active option visible.
     lv_obj_t* matrix = lv_buttonmatrix_create(parent);
+    // Unlike lv_button, lv_buttonmatrix never clears the base lv_obj default of
+    // SCROLLABLE — with the display's low touch-scroll threshold, a tap with any jitter
+    // could still be consumed as the matrix trying to scroll itself, aborting the click.
+    lv_obj_remove_flag(matrix, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_size(matrix, lv_pct(100), 36);
     lv_obj_set_style_bg_opa(matrix, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_bg_color(matrix, colors.bg, LV_PART_MAIN);
@@ -380,6 +391,11 @@ void OnSettingsTapped(lv_event_t* e) {
     theme::ApplyMsgboxFont(title);
     lv_msgbox_add_close_button(mbox);
     lv_obj_t* content = lv_msgbox_get_content(mbox);
+    // Scrollable by default, unlike every other container in this file — with the
+    // display's low touch-scroll threshold (LV_INDEV_DEF_SCROLL_LIMIT), the buttonmatrix
+    // below competed with this content area for the same gesture, so a tap sometimes
+    // registered as an aborted scroll instead of a click and needed a second, cleaner tap.
+    lv_obj_remove_flag(content, LV_OBJ_FLAG_SCROLLABLE);
 
     switch (widgets->current_mode) {
         case openwb::ChargeMode::kInstant: {
@@ -552,15 +568,43 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     // Ziel/Reichweite: the OUTER column is fixed-width and never hidden, so Leistung/
     // Phasen/Strom/Geladen never shift position — only the INNER content (caption +
     // icon/value) toggles, leaving an empty but still-reserved slot when not applicable.
+    // Reichweite is created first so it lands before Ziel, which sits last in the row.
+    widgets->range_col = lv_obj_create(stats_row);
+    lv_obj_set_style_bg_opa(widgets->range_col, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(widgets->range_col, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(widgets->range_col, 0, LV_PART_MAIN);
+    lv_obj_set_size(widgets->range_col, 85, LV_SIZE_CONTENT);
+    lv_obj_remove_flag(widgets->range_col, LV_OBJ_FLAG_SCROLLABLE);
+    // A flex container (even with a single child) is what makes LVGL recompute this
+    // column's own LV_SIZE_CONTENT height when range_content toggles hidden/visible later
+    // — a plain lv_obj's content-size cache isn't refreshed by that transition.
+    lv_obj_set_flex_flow(widgets->range_col, LV_FLEX_FLOW_COLUMN);
+
+    widgets->range_content = lv_obj_create(widgets->range_col);
+    lv_obj_set_style_bg_opa(widgets->range_content, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(widgets->range_content, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(widgets->range_content, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_row(widgets->range_content, 2, LV_PART_MAIN);
+    lv_obj_set_flex_flow(widgets->range_content, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_size(widgets->range_content, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_remove_flag(widgets->range_content, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t* range_caption = lv_label_create(widgets->range_content);
+    lv_label_set_text(range_caption, "Reichweite");
+    lv_obj_set_style_text_font(range_caption, &font_sans_11, LV_PART_MAIN);
+    lv_obj_set_style_text_color(range_caption, colors.muted, LV_PART_MAIN);
+
+    widgets->stat_range_label = lv_label_create(widgets->range_content);
+    lv_obj_set_style_text_font(widgets->stat_range_label, &font_sans_14, LV_PART_MAIN);
+    lv_label_set_text(widgets->stat_range_label, "-");
+    lv_obj_add_flag(widgets->range_content, LV_OBJ_FLAG_HIDDEN);
+
     widgets->goal_col = lv_obj_create(stats_row);
     lv_obj_set_style_bg_opa(widgets->goal_col, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(widgets->goal_col, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(widgets->goal_col, 0, LV_PART_MAIN);
     lv_obj_set_size(widgets->goal_col, 75, LV_SIZE_CONTENT);
     lv_obj_remove_flag(widgets->goal_col, LV_OBJ_FLAG_SCROLLABLE);
-    // A flex container (even with a single child) is what makes LVGL recompute this
-    // column's own LV_SIZE_CONTENT height when goal_content toggles hidden/visible later
-    // — a plain lv_obj's content-size cache isn't refreshed by that transition.
     lv_obj_set_flex_flow(widgets->goal_col, LV_FLEX_FLOW_COLUMN);
 
     widgets->goal_content = lv_obj_create(widgets->goal_col);
@@ -583,33 +627,6 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     lv_obj_set_style_text_font(widgets->stat_goal_label, &font_sans_14, LV_PART_MAIN);
     lv_label_set_text(widgets->stat_goal_label, "-");
     lv_obj_add_flag(widgets->goal_content, LV_OBJ_FLAG_HIDDEN);
-
-    widgets->range_col = lv_obj_create(stats_row);
-    lv_obj_set_style_bg_opa(widgets->range_col, LV_OPA_TRANSP, LV_PART_MAIN);
-    lv_obj_set_style_border_width(widgets->range_col, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(widgets->range_col, 0, LV_PART_MAIN);
-    lv_obj_set_size(widgets->range_col, 85, LV_SIZE_CONTENT);
-    lv_obj_remove_flag(widgets->range_col, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_flex_flow(widgets->range_col, LV_FLEX_FLOW_COLUMN);
-
-    widgets->range_content = lv_obj_create(widgets->range_col);
-    lv_obj_set_style_bg_opa(widgets->range_content, LV_OPA_TRANSP, LV_PART_MAIN);
-    lv_obj_set_style_border_width(widgets->range_content, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(widgets->range_content, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_row(widgets->range_content, 2, LV_PART_MAIN);
-    lv_obj_set_flex_flow(widgets->range_content, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_size(widgets->range_content, lv_pct(100), LV_SIZE_CONTENT);
-    lv_obj_remove_flag(widgets->range_content, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_obj_t* range_caption = lv_label_create(widgets->range_content);
-    lv_label_set_text(range_caption, "Reichweite");
-    lv_obj_set_style_text_font(range_caption, &font_sans_11, LV_PART_MAIN);
-    lv_obj_set_style_text_color(range_caption, colors.muted, LV_PART_MAIN);
-
-    widgets->stat_range_label = lv_label_create(widgets->range_content);
-    lv_obj_set_style_text_font(widgets->stat_range_label, &font_sans_14, LV_PART_MAIN);
-    lv_label_set_text(widgets->stat_range_label, "-");
-    lv_obj_add_flag(widgets->range_content, LV_OBJ_FLAG_HIDDEN);
 
     return card;
 }

@@ -94,6 +94,10 @@ lv_obj_t* CreateModeSwitch(lv_obj_t* parent, uint8_t chargepoint_id) {
     const theme::Palette& colors = theme::Colors(config::Store().Get().dark_mode);
 
     lv_obj_t* matrix = lv_buttonmatrix_create(parent);
+    // Unlike lv_button, lv_buttonmatrix never clears the base lv_obj default of
+    // SCROLLABLE — with the display's low touch-scroll threshold, a tap with any jitter
+    // could be consumed as the matrix trying to scroll itself, aborting the click.
+    lv_obj_remove_flag(matrix, LV_OBJ_FLAG_SCROLLABLE);
     // Explicit height: lv_buttonmatrix's default is much taller than its content,
     // which balloons the selected pill (LV_RADIUS_CIRCLE rounds to half the smaller
     // dimension) into an oversized capsule.

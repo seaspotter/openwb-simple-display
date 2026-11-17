@@ -12,7 +12,10 @@ struct ChargepointStatus {
     float power_w = 0;
     bool plugged = false;
     bool charging = false;
-    char state_str[96] = ""; // real messages can include a live countdown, e.g. "...in 19 Sek."
+    // Real messages can be multi-sentence with a live countdown (e.g. "...in 19 Sek.") and
+    // German umlauts, which cost 2 bytes each in UTF-8 — 96 silently truncated a message
+    // mid-word ("...Lädt mit Übersc|huss." cut right at the boundary); sized with headroom.
+    char state_str[192] = "";
     char fault_str[64] = "";
     uint8_t fault_state = 0;
 

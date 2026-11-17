@@ -319,7 +319,11 @@ bool Connect() {
 }
 
 void Publish(uint8_t chargepoint_id, const char* param, const char* value) {
-    char topic[64];
+    // "openWB/simpleAPI/set/chargepoint/<id>/instant_charging_limit_amount" alone is 65
+    // bytes including the null terminator — a 64-byte buffer silently truncated it to
+    // ".../instant_charging_limit_amoun", a topic openWB never recognized, so the write
+    // was dropped with no error. Sized with real headroom instead of the next-exact fit.
+    char topic[96];
     snprintf(topic, sizeof(topic), "openWB/simpleAPI/set/chargepoint/%u/%s", chargepoint_id, param);
     g_mqtt.publish(topic, value, /*retained=*/true);
 }
@@ -398,8 +402,12 @@ void SetPvLimitAmount(uint8_t chargepoint_id, float amount_kwh) {
 }
 
 void SetMaxPriceEcoCt(uint8_t chargepoint_id, float price_ct) {
+    // Despite the wiki calling this topic's unit "EUR" (example "0.25"), empirically
+    // openWB expects the plain ct/kWh number and does its own ct->EUR/Wh conversion
+    // (confirmed live: sending price_ct/100 here, i.e. pre-converting to EUR, produced
+    // a stored price 100x too small — exactly the gap closed by not pre-dividing).
     char value[16];
-    snprintf(value, sizeof(value), "%.4f", price_ct / 100.0f); // ct -> EUR
+    snprintf(value, sizeof(value), "%.1f", price_ct);
     Publish(chargepoint_id, "max_price_eco", value);
 }
 
