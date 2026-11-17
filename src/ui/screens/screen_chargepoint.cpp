@@ -36,9 +36,13 @@ struct ChargepointCardWidgets {
     lv_obj_t* stat_phases_label;
     lv_obj_t* stat_current_label;
     lv_obj_t* stat_charged_label;
-    lv_obj_t* goal_col;        // "Ziel" column; hidden entirely when there's no limit
-    lv_obj_t* stat_goal_label; // the active Ladebegrenzung's target value
-    lv_obj_t* range_col; // hidden unless charging with a known positive range
+    // Ziel/Reichweite: *_col is the fixed-width outer slot (always present, so the
+    // other columns never shift); *_content is the caption+value that actually hides.
+    lv_obj_t* goal_col;
+    lv_obj_t* goal_content;
+    lv_obj_t* stat_goal_label;
+    lv_obj_t* range_col;
+    lv_obj_t* range_content;
     lv_obj_t* stat_range_label;
 
     bool locked = false;
@@ -93,7 +97,10 @@ void ApplyBadgeStyle(lv_obj_t* label, lv_color_t color, bool tinted) {
                                  LV_PART_MAIN);
 }
 
-lv_obj_t* CreateStatColumn(lv_obj_t* parent, const char* label_text) {
+// Fixed width, not flex_grow: each stat keeps its own position regardless of whether
+// Ziel/Reichweite (see below) are showing content that tick — equal redistribution
+// made every column visibly shift whenever those two toggled.
+lv_obj_t* CreateStatColumn(lv_obj_t* parent, const char* label_text, lv_coord_t width) {
     const theme::Palette& colors = theme::Colors(config::Store().Get().dark_mode);
 
     lv_obj_t* col = lv_obj_create(parent);
@@ -102,8 +109,7 @@ lv_obj_t* CreateStatColumn(lv_obj_t* parent, const char* label_text) {
     lv_obj_set_style_pad_all(col, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_row(col, 2, LV_PART_MAIN);
     lv_obj_set_flex_flow(col, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_size(col, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_flex_grow(col, 1);
+    lv_obj_set_size(col, width, LV_SIZE_CONTENT);
     lv_obj_remove_flag(col, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t* label = lv_label_create(col);
@@ -317,6 +323,10 @@ void CreateLimitEditor(lv_obj_t* parent, uint8_t chargepoint_id, bool is_pv, con
     lv_obj_set_style_text_color(matrix, lv_color_white(), LV_PART_ITEMS | LV_STATE_CHECKED);
     lv_buttonmatrix_set_map(matrix, kLimitTypeButtonMap);
     lv_buttonmatrix_set_one_checked(matrix, true);
+    // Without CHECKABLE, tapping a button still fires VALUE_CHANGED (so the MQTT write
+    // goes out) but LVGL never moves its own internal checked bit — the exact bug
+    // reported: the write takes effect, but the active option never visibly changes.
+    lv_buttonmatrix_set_button_ctrl_all(matrix, LV_BUTTONMATRIX_CTRL_CHECKABLE);
     uint32_t initial_index = strcmp(initial_type, "soc") == 0 ? 1 : strcmp(initial_type, "amount") == 0 ? 2 : 0;
     lv_buttonmatrix_set_button_ctrl(matrix, initial_index, LV_BUTTONMATRIX_CTRL_CHECKED);
     lv_obj_add_event_cb(matrix, OnLimitTypeChanged, LV_EVENT_VALUE_CHANGED, state);
@@ -514,44 +524,92 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     lv_obj_set_style_bg_opa(stats_row, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(stats_row, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(stats_row, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_column(stats_row, 10, LV_PART_MAIN);
+    lv_obj_set_style_pad_column(stats_row, 6, LV_PART_MAIN);
     lv_obj_set_flex_flow(stats_row, LV_FLEX_FLOW_ROW);
     lv_obj_set_size(stats_row, lv_pct(100), LV_SIZE_CONTENT);
     lv_obj_remove_flag(stats_row, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t* power_col = CreateStatColumn(stats_row, "Leistung");
+    lv_obj_t* power_col = CreateStatColumn(stats_row, "Leistung", 80);
     widgets->stat_power_label = lv_label_create(power_col);
     lv_obj_set_style_text_font(widgets->stat_power_label, &font_sans_14, LV_PART_MAIN);
     lv_label_set_text(widgets->stat_power_label, "0 W");
 
-    lv_obj_t* phases_col = CreateStatColumn(stats_row, "Phasen");
+    lv_obj_t* phases_col = CreateStatColumn(stats_row, "Phasen", 34);
     widgets->stat_phases_label = lv_label_create(phases_col);
     lv_obj_set_style_text_font(widgets->stat_phases_label, &font_sans_14, LV_PART_MAIN);
     lv_label_set_text(widgets->stat_phases_label, "-");
 
-    lv_obj_t* current_col = CreateStatColumn(stats_row, "Strom");
+    lv_obj_t* current_col = CreateStatColumn(stats_row, "Strom", 48);
     widgets->stat_current_label = lv_label_create(current_col);
     lv_obj_set_style_text_font(widgets->stat_current_label, &font_sans_14, LV_PART_MAIN);
     lv_label_set_text(widgets->stat_current_label, "0 A");
 
-    lv_obj_t* charged_col = CreateStatColumn(stats_row, "Geladen");
+    lv_obj_t* charged_col = CreateStatColumn(stats_row, "Geladen", 70);
     widgets->stat_charged_label = lv_label_create(charged_col);
     lv_obj_set_style_text_font(widgets->stat_charged_label, &font_sans_14, LV_PART_MAIN);
     lv_label_set_text(widgets->stat_charged_label, "0,0 kWh");
 
-    widgets->goal_col = CreateStatColumn(stats_row, "Ziel");
-    lv_obj_t* goal_value_row = widgets::CreateGroupRow(widgets->goal_col, LV_FLEX_ALIGN_START, 4);
+    // Ziel/Reichweite: the OUTER column is fixed-width and never hidden, so Leistung/
+    // Phasen/Strom/Geladen never shift position — only the INNER content (caption +
+    // icon/value) toggles, leaving an empty but still-reserved slot when not applicable.
+    widgets->goal_col = lv_obj_create(stats_row);
+    lv_obj_set_style_bg_opa(widgets->goal_col, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(widgets->goal_col, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(widgets->goal_col, 0, LV_PART_MAIN);
+    lv_obj_set_size(widgets->goal_col, 75, LV_SIZE_CONTENT);
+    lv_obj_remove_flag(widgets->goal_col, LV_OBJ_FLAG_SCROLLABLE);
+    // A flex container (even with a single child) is what makes LVGL recompute this
+    // column's own LV_SIZE_CONTENT height when goal_content toggles hidden/visible later
+    // — a plain lv_obj's content-size cache isn't refreshed by that transition.
+    lv_obj_set_flex_flow(widgets->goal_col, LV_FLEX_FLOW_COLUMN);
+
+    widgets->goal_content = lv_obj_create(widgets->goal_col);
+    lv_obj_set_style_bg_opa(widgets->goal_content, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(widgets->goal_content, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(widgets->goal_content, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_row(widgets->goal_content, 2, LV_PART_MAIN);
+    lv_obj_set_flex_flow(widgets->goal_content, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_size(widgets->goal_content, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_remove_flag(widgets->goal_content, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t* goal_caption = lv_label_create(widgets->goal_content);
+    lv_label_set_text(goal_caption, "Ziel");
+    lv_obj_set_style_text_font(goal_caption, &font_sans_11, LV_PART_MAIN);
+    lv_obj_set_style_text_color(goal_caption, colors.muted, LV_PART_MAIN);
+
+    lv_obj_t* goal_value_row = widgets::CreateGroupRow(widgets->goal_content, LV_FLEX_ALIGN_START, 4);
     widgets::CreateIconLabel(goal_value_row, icon::Glyph::kGoal, colors.muted);
     widgets->stat_goal_label = lv_label_create(goal_value_row);
     lv_obj_set_style_text_font(widgets->stat_goal_label, &font_sans_14, LV_PART_MAIN);
     lv_label_set_text(widgets->stat_goal_label, "-");
-    lv_obj_add_flag(widgets->goal_col, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(widgets->goal_content, LV_OBJ_FLAG_HIDDEN);
 
-    widgets->range_col = CreateStatColumn(stats_row, "Reichweite");
-    widgets->stat_range_label = lv_label_create(widgets->range_col);
+    widgets->range_col = lv_obj_create(stats_row);
+    lv_obj_set_style_bg_opa(widgets->range_col, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(widgets->range_col, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(widgets->range_col, 0, LV_PART_MAIN);
+    lv_obj_set_size(widgets->range_col, 85, LV_SIZE_CONTENT);
+    lv_obj_remove_flag(widgets->range_col, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(widgets->range_col, LV_FLEX_FLOW_COLUMN);
+
+    widgets->range_content = lv_obj_create(widgets->range_col);
+    lv_obj_set_style_bg_opa(widgets->range_content, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(widgets->range_content, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(widgets->range_content, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_row(widgets->range_content, 2, LV_PART_MAIN);
+    lv_obj_set_flex_flow(widgets->range_content, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_size(widgets->range_content, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_remove_flag(widgets->range_content, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t* range_caption = lv_label_create(widgets->range_content);
+    lv_label_set_text(range_caption, "Reichweite");
+    lv_obj_set_style_text_font(range_caption, &font_sans_11, LV_PART_MAIN);
+    lv_obj_set_style_text_color(range_caption, colors.muted, LV_PART_MAIN);
+
+    widgets->stat_range_label = lv_label_create(widgets->range_content);
     lv_obj_set_style_text_font(widgets->stat_range_label, &font_sans_14, LV_PART_MAIN);
     lv_label_set_text(widgets->stat_range_label, "-");
-    lv_obj_add_flag(widgets->range_col, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(widgets->range_content, LV_OBJ_FLAG_HIDDEN);
 
     return card;
 }
@@ -609,9 +667,9 @@ void RefreshChargepointCard(lv_obj_t* card, const openwb::ChargepointStatus& sta
     lv_label_set_text_fmt(widgets->stat_charged_label, "%.1f kWh", status.energy_charged_wh / 1000.0f);
     if (status.charging && status.range_km > 0) {
         lv_label_set_text_fmt(widgets->stat_range_label, "+%.0f km", status.range_km);
-        lv_obj_remove_flag(widgets->range_col, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(widgets->range_content, LV_OBJ_FLAG_HIDDEN);
     } else {
-        lv_obj_add_flag(widgets->range_col, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(widgets->range_content, LV_OBJ_FLAG_HIDDEN);
     }
 
     openwb::ChargeMode mode = openwb::ChargeMode::kStop;
@@ -651,14 +709,14 @@ void RefreshChargepointCard(lv_obj_t* card, const openwb::ChargepointStatus& sta
     if (mode_known && strcmp(limit_type, "soc") == 0) {
         float soc = mode == openwb::ChargeMode::kInstant ? status.instant_limit_soc : status.pv_limit_soc;
         lv_label_set_text_fmt(widgets->stat_goal_label, "%.0f %%", soc);
-        lv_obj_remove_flag(widgets->goal_col, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(widgets->goal_content, LV_OBJ_FLAG_HIDDEN);
     } else if (mode_known && strcmp(limit_type, "amount") == 0) {
         float amount =
             mode == openwb::ChargeMode::kInstant ? status.instant_limit_amount_kwh : status.pv_limit_amount_kwh;
         lv_label_set_text_fmt(widgets->stat_goal_label, "%.0f kWh", amount);
-        lv_obj_remove_flag(widgets->goal_col, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(widgets->goal_content, LV_OBJ_FLAG_HIDDEN);
     } else {
-        lv_obj_add_flag(widgets->goal_col, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(widgets->goal_content, LV_OBJ_FLAG_HIDDEN);
     }
 }
 

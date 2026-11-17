@@ -5,6 +5,7 @@
 
 #include "net/net_task.h"
 #include "ui/lvgl_port.h"
+#include "ui/ui_events.h"
 #include "util/logging.h"
 
 namespace {
@@ -16,6 +17,7 @@ void setup() {
     util::LogInfo(kTag, "booting");
 
     ui::Init();
+    ui::InitEvents();
     net::Init();
 }
 
