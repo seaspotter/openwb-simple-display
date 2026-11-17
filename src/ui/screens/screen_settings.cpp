@@ -90,8 +90,8 @@ lv_obj_t* CreateCard(lv_obj_t* parent, const char* heading, const theme::Palette
     lv_obj_t* card = lv_obj_create(parent);
     lv_obj_add_style(card, theme::PanelStyle(), LV_PART_MAIN);
     lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_all(card, 16, LV_PART_MAIN);
-    lv_obj_set_style_pad_row(card, 10, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(card, 10, LV_PART_MAIN);
+    lv_obj_set_style_pad_row(card, 6, LV_PART_MAIN);
     lv_obj_set_size(card, lv_pct(100), LV_SIZE_CONTENT);
     lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
 
@@ -125,8 +125,8 @@ void ShowSettingsScreen() {
     lv_obj_t* screen = lv_obj_create(nullptr);
     lv_obj_add_style(screen, theme::ScreenStyle(), LV_PART_MAIN);
     lv_obj_set_flex_flow(screen, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_all(screen, 16, LV_PART_MAIN);
-    lv_obj_set_style_pad_row(screen, 16, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(screen, 12, LV_PART_MAIN);
+    lv_obj_set_style_pad_row(screen, 10, LV_PART_MAIN);
 
     const config::AppConfig& cfg = config::Store().Get();
     const theme::Palette& colors = theme::Colors(cfg.dark_mode);
@@ -144,29 +144,31 @@ void ShowSettingsScreen() {
     // Anzeige.
     lv_obj_t* display_card = CreateCard(screen, "ANZEIGE", colors);
 
-    lv_obj_t* brightness_label = lv_label_create(display_card);
-    lv_label_set_text(brightness_label, "Helligkeit");
-
     auto* brightness_state = new BrightnessState{cfg.brightness_pct, nullptr};
     lv_obj_t* brightness_row = lv_obj_create(display_card);
     lv_obj_set_style_bg_opa(brightness_row, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(brightness_row, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(brightness_row, 0, LV_PART_MAIN);
     lv_obj_set_flex_flow(brightness_row, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(brightness_row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_flex_align(brightness_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_size(brightness_row, lv_pct(100), LV_SIZE_CONTENT);
     lv_obj_remove_flag(brightness_row, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t* minus_btn = lv_button_create(brightness_row);
+    lv_label_set_text(lv_label_create(brightness_row), "Helligkeit");
+
+    lv_obj_t* stepper_group = widgets::CreateGroupRow(brightness_row, LV_FLEX_ALIGN_CENTER, 0);
+
+    lv_obj_t* minus_btn = lv_button_create(stepper_group);
     lv_obj_add_style(minus_btn, theme::FlatButtonStyle(), LV_PART_MAIN);
     lv_obj_set_user_data(minus_btn, reinterpret_cast<void*>(-1));
     lv_label_set_text(lv_label_create(minus_btn), "-");
     lv_obj_add_event_cb(minus_btn, OnBrightnessStep, LV_EVENT_CLICKED, brightness_state);
 
-    brightness_state->value_label = lv_label_create(brightness_row);
+    brightness_state->value_label = lv_label_create(stepper_group);
     lv_obj_set_style_pad_hor(brightness_state->value_label, 12, LV_PART_MAIN);
     lv_label_set_text_fmt(brightness_state->value_label, "%d %%", static_cast<int>(cfg.brightness_pct));
 
-    lv_obj_t* plus_btn = lv_button_create(brightness_row);
+    lv_obj_t* plus_btn = lv_button_create(stepper_group);
     lv_obj_add_style(plus_btn, theme::FlatButtonStyle(), LV_PART_MAIN);
     lv_obj_set_user_data(plus_btn, reinterpret_cast<void*>(1));
     lv_label_set_text(lv_label_create(plus_btn), "+");
