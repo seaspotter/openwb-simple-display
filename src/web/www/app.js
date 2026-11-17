@@ -1,3 +1,20 @@
+// The web page's own light/dark appearance is independent of the display's own
+// "Darstellung" setting below — this is just how the page looks in your browser,
+// remembered per-browser via localStorage, not written to the device at all.
+function initWebUiTheme() {
+  const toggle = document.getElementById("webui-theme-toggle");
+  const saved = localStorage.getItem("webui-theme");
+  const dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  applyWebUiTheme(dark);
+  toggle.checked = dark;
+  toggle.addEventListener("change", () => applyWebUiTheme(toggle.checked));
+}
+
+function applyWebUiTheme(dark) {
+  document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  localStorage.setItem("webui-theme", dark ? "dark" : "light");
+}
+
 function showToast(message) {
   const toast = document.getElementById("toast");
   toast.textContent = message;
@@ -27,7 +44,6 @@ async function loadConfig() {
   document.getElementById("screen_timeout_s").value = cfg.screen_timeout_s;
   document.getElementById("show_flow_chart").value = String(cfg.show_flow_chart);
   document.getElementById("dark_mode").value = String(cfg.dark_mode);
-  document.documentElement.setAttribute("data-theme", cfg.dark_mode ? "dark" : "light");
   document.getElementById("pin-status").textContent = cfg.has_web_ui_pin ? "Aktiv" : "Deaktiviert";
 }
 
@@ -40,6 +56,7 @@ async function loadStatus() {
     rows.push(rowHtml("PV-Leistung", `${Math.round(data.global.pv_power_w)} W`, "tag-pv"));
     rows.push(rowHtml("Netzleistung", `${Math.round(data.global.grid_power_w)} W`, "tag-grid"));
     if (data.global.battery_soc_percent >= 0) {
+      rows.push(rowHtml("Speicher-Leistung", `${Math.round(data.global.battery_power_w)} W`, "tag-battery"));
       rows.push(rowHtml("Speicher-Ladestand", `${Math.round(data.global.battery_soc_percent)}%`, "tag-battery"));
     }
     rows.push(rowHtml("Verbraucher", `${Math.round(data.global.consumer_power_w)} W`, "tag-consumer"));
@@ -88,13 +105,6 @@ function readSettingsForm() {
   const password = document.getElementById("mqtt_password").value;
   if (password) body.mqtt_password = password;
   return body;
-}
-
-async function saveSettings() {
-  const body = readSettingsForm();
-  const res = await postJson("/api/config", body);
-  showToast(res.ok ? "Gespeichert." : "Einstellungen konnten nicht gespeichert werden.");
-  document.documentElement.setAttribute("data-theme", body.dark_mode ? "dark" : "light");
 }
 
 async function saveAndRestart() {
@@ -173,13 +183,13 @@ async function resetWifi() {
   showToast("WLAN wird zurückgesetzt — Display startet neu.");
 }
 
-document.getElementById("save-btn").addEventListener("click", saveSettings);
 document.getElementById("save-restart-btn").addEventListener("click", saveAndRestart);
 document.getElementById("check-update-btn").addEventListener("click", checkForUpdate);
 document.getElementById("install-update-btn").addEventListener("click", installUpdate);
 document.getElementById("reset-wifi-btn").addEventListener("click", resetWifi);
 document.getElementById("set-pin-btn").addEventListener("click", setWebUiPin);
 
+initWebUiTheme();
 loadConfig();
 loadStatus();
 loadInfo();
