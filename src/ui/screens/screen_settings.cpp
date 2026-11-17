@@ -142,21 +142,10 @@ void ShowSettingsScreen() {
     lv_obj_set_style_text_font(title_label, &font_sans_14_bold, LV_PART_MAIN);
 
     // Anzeige.
-    lv_obj_t* display_card = CreateCard(screen, "ANZEIGE", colors);
+    lv_obj_t* display_card = CreateCard(screen, "Display Helligkeit", colors);
 
     auto* brightness_state = new BrightnessState{cfg.brightness_pct, nullptr};
-    lv_obj_t* brightness_row = lv_obj_create(display_card);
-    lv_obj_set_style_bg_opa(brightness_row, LV_OPA_TRANSP, LV_PART_MAIN);
-    lv_obj_set_style_border_width(brightness_row, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(brightness_row, 0, LV_PART_MAIN);
-    lv_obj_set_flex_flow(brightness_row, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(brightness_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_size(brightness_row, lv_pct(100), LV_SIZE_CONTENT);
-    lv_obj_remove_flag(brightness_row, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_label_set_text(lv_label_create(brightness_row), "Helligkeit");
-
-    lv_obj_t* stepper_group = widgets::CreateGroupRow(brightness_row, LV_FLEX_ALIGN_CENTER, 0);
+    lv_obj_t* stepper_group = widgets::CreateGroupRow(display_card, LV_FLEX_ALIGN_START, 0);
 
     lv_obj_t* minus_btn = lv_button_create(stepper_group);
     lv_obj_add_style(minus_btn, theme::FlatButtonStyle(), LV_PART_MAIN);
