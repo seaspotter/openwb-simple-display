@@ -47,14 +47,20 @@ lv_obj_t* CreateFlowBar(lv_obj_t* parent, const lv_color_t* colors, uint8_t coun
 
 void UpdateFlowBar(lv_obj_t* bar, const float* magnitudes, const lv_color_t* colors, uint8_t count) {
     if (count > kFlowBarMaxSegments) count = kFlowBarMaxSegments;
+    uint32_t created_segments = lv_obj_get_child_count(bar);
 
     float total = 0;
     for (uint8_t i = 0; i < count; ++i) total += std::fabs(magnitudes[i]);
 
-    for (uint8_t i = 0; i < count; ++i) {
+    for (uint32_t i = 0; i < created_segments; ++i) {
         lv_obj_t* segment = lv_obj_get_child(bar, i);
-        lv_obj_set_flex_grow(segment, WeightFor(std::fabs(magnitudes[i]), total));
-        lv_obj_set_style_bg_color(segment, colors[i], LV_PART_MAIN);
+        if (i < count) {
+            lv_obj_set_flex_grow(segment, WeightFor(std::fabs(magnitudes[i]), total));
+            lv_obj_set_style_bg_color(segment, colors[i], LV_PART_MAIN);
+        } else {
+            lv_obj_set_flex_grow(segment, 0);
+            lv_obj_set_width(segment, 0);
+        }
     }
 }
 

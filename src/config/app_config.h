@@ -9,7 +9,7 @@
 namespace config {
 
 // Bump on any field add/remove/retype; config_store.cpp::Migrate() handles the rest.
-inline constexpr uint8_t kCurrentSchemaVersion = 1;
+inline constexpr uint8_t kCurrentSchemaVersion = 3; // v3: dropped extra_meter_id, added show_flow_chart
 
 struct AppConfig {
     uint8_t schema_version = kCurrentSchemaVersion;
@@ -36,6 +36,7 @@ struct AppConfig {
     uint16_t screen_timeout_s = 0; // seconds of inactivity before dimming off; 0 = never
     uint16_t rotation = 0;           // degrees: 0/90/180/270
     bool dark_mode = false;
+    bool show_flow_chart = true; // the PV/grid/battery/... flow bars above the chargepoint pager
 
     bool ota_auto_check = true; // background checks only notify, never auto-install
     char ota_manifest_url[128] = DEFAULT_OTA_MANIFEST_URL;

@@ -26,10 +26,11 @@ mkdir -p "${OUT_DIR}"
 # Codepoints per @tabler/icons-webfont@3.51.0's dist/tabler-icons.css; pin that version
 # if regenerating, since codepoints can shift between releases.
 #   0xEB30 sun            -> PV (Erzeugung)
-#   0xF00A plug-connected -> Netz (grid)
-#   0xEA38 bolt           -> Ladepunkte (chargepoints)
+#   0xEA38 bolt           -> Netz (grid) AND Ladepunkte (chargepoints) — same shape,
+#                             different colors, matching openWB's own quartz web theme
 #   0xEA34 battery        -> Speicher (battery)
-#   0xF336 home-bolt      -> Verbraucher (other consumers)
+#   0xEAC1 home           -> Hausverbrauch (home base load)
+#   0xEA97 droplet        -> Verbraucher (other consumers)
 #   0xEAE1 lock-open      -> chargepoint lock button (unlocked state)
 #   0xEAE2 lock           -> chargepoint lock button (locked state)
 #   0xEB20 settings       -> future settings-gear use
@@ -44,7 +45,7 @@ lv_font_conv \
   --bpp 4 \
   --format lvgl \
   --no-compress \
-  --range 0xEA06,0xEA34,0xEA38,0xEA71,0xEAE1,0xEAE2,0xEB20,0xEB30,0xEB52,0xEBBB,0xECFA,0xF00A,0xF336 \
+  --range 0xEA06,0xEA34,0xEA38,0xEA71,0xEA97,0xEAC1,0xEAE1,0xEAE2,0xEB20,0xEB30,0xEB52,0xEBBB,0xECFA \
   --lv-font-name font_icons_16 \
   -o "${OUT_DIR}/font_icons_16.c"
 echo "generated font_icons_16.c"

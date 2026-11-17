@@ -21,6 +21,10 @@ void EnsureTouchEventHooked() {
         if (lv_indev_get_type(indev) == LV_INDEV_TYPE_POINTER) {
             lv_indev_add_event_cb(indev, OnIndevEvent, LV_EVENT_PRESSED, nullptr);
             lv_indev_add_event_cb(indev, OnIndevEvent, LV_EVENT_PRESSING, nullptr);
+            // Default (LV_DEF_REFR_PERIOD, 33ms) samples touch noticeably slower than
+            // our own 5ms render tick — tightening just this timer (not the shared
+            // display-refresh one) makes a swipe start following the finger sooner.
+            lv_timer_set_period(lv_indev_get_read_timer(indev), 10);
         }
     }
     g_touch_event_hooked = true;

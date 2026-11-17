@@ -46,6 +46,7 @@ state::CommandResult ExecuteCommand(const CommandRequest& req) {
 
 void NetTask(void* /*param*/) {
     net::Provision(); // blocks until provisioned on first boot
+    state::State().SetNetworkReady(true); // tells the UI task to leave the boot screen
 
     time_sync::Init();
     web::InitServer();
@@ -80,6 +81,12 @@ void NetTask(void* /*param*/) {
         if (xQueueReceive(g_command_queue, &req, 0) == pdTRUE) {
             state::CommandResult result = ExecuteCommand(req);
             xQueueSend(g_result_queue, &result, 0);
+        }
+
+        uint8_t pending_brightness;
+        if (state::State().TryTakePendingBrightnessSave(&pending_brightness)) {
+            config::Store().Update(
+                [pending_brightness](config::AppConfig& c) { c.brightness_pct = pending_brightness; });
         }
 
         vTaskDelay(pdMS_TO_TICKS(50));

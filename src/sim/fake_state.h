@@ -14,6 +14,7 @@ inline void SeedFakeState() {
     global.grid_power_w = -850;
     global.battery_power_w = 410;
     global.consumer_power_w = 620;
+    global.home_consumption_w = 870;
     global.battery_soc_percent = 72;
     state::State().SetGlobalStatus(global);
 

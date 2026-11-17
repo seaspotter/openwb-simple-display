@@ -18,8 +18,11 @@ namespace screens {
 namespace {
 
 constexpr uint32_t kRefreshIntervalMs = 500;
-constexpr uint8_t kSupplySlots = 2;
-constexpr uint8_t kDemandSlots = 4;
+// Max pool of legend/bar slots each bar can show; how many are actually visible each
+// tick depends on how many categories are currently non-zero (see FilterNonZero).
+constexpr uint8_t kSupplySlots = 3; // PV, grid import, battery discharge
+constexpr uint8_t kDemandSlots = 5; // chargepoints, battery charge, grid export,
+                                     // Verbraucher, Hausverbrauch
 
 std::vector<lv_obj_t*> g_chargepoint_cards;
 
@@ -42,7 +45,34 @@ struct FlowItem {
     float magnitude;
 };
 
-// Ascending insertion sort — at most 4 items, not worth pulling in <algorithm> for.
+// Matches quartz's own web formatting: plain watts below 1000, otherwise kW with a
+// German decimal comma at 2 places.
+void FormatPowerW(float watts, char* out, size_t out_size) {
+    float abs_w = watts < 0 ? -watts : watts;
+    if (abs_w < 1000.0f) {
+        snprintf(out, out_size, "%.0f W", watts);
+        return;
+    }
+    snprintf(out, out_size, "%.2f kW", watts / 1000.0f);
+    for (char* p = out; *p != '\0'; ++p) {
+        if (*p == '.') {
+            *p = ',';
+            break;
+        }
+    }
+}
+
+// Drops near-zero categories entirely rather than showing a "0 W" entry/sliver —
+// e.g. an unconfigured Zähler, or a battery that's neither charging nor discharging.
+uint8_t FilterNonZero(const FlowItem* candidates, uint8_t candidate_count, FlowItem* out) {
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < candidate_count; ++i) {
+        if (candidates[i].magnitude >= 1.0f || candidates[i].magnitude <= -1.0f) out[n++] = candidates[i];
+    }
+    return n;
+}
+
+// Ascending insertion sort — at most 6 items, not worth pulling in <algorithm> for.
 void SortAscending(FlowItem* items, uint8_t count) {
     for (uint8_t i = 1; i < count; ++i) {
         FlowItem key = items[i];
@@ -73,7 +103,7 @@ void CreateLegendEntry(lv_obj_t* parent, lv_obj_t** out_icon_label, lv_obj_t** o
 
     lv_obj_t* value = lv_label_create(entry);
     lv_label_set_text(value, "-");
-    lv_obj_set_style_text_font(value, &font_sans_11, LV_PART_MAIN);
+    lv_obj_set_style_text_font(value, &font_sans_14, LV_PART_MAIN);
 
     *out_icon_label = icon_label;
     *out_value_label = value;
@@ -116,8 +146,8 @@ lv_obj_t* CreateGlobalPanel(lv_obj_t* parent) {
         CreateLegendEntry(supply_legend, &g_supply_icon_labels[i], &g_supply_value_labels[i]);
     }
 
-    const lv_color_t placeholder_colors[widgets::kFlowBarMaxSegments] = {
-        colors.muted, colors.muted, colors.muted, colors.muted};
+    lv_color_t placeholder_colors[widgets::kFlowBarMaxSegments];
+    for (lv_color_t& c : placeholder_colors) c = colors.muted;
     g_supply_bar = widgets::CreateFlowBar(panel, placeholder_colors, kSupplySlots);
     // margin, not padding: pad_bottom shrinks the bar's own content height instead.
     lv_obj_set_style_margin_bottom(g_supply_bar, 4, LV_PART_MAIN);
@@ -135,29 +165,34 @@ lv_obj_t* CreateGlobalPanel(lv_obj_t* parent) {
     return panel;
 }
 
-// Sorts ascending by magnitude, then rebinds each slot's icon/color/value and the
-// matching flow-bar segment to its newly-assigned category.
-void ApplySortedSlots(FlowItem* items, uint8_t count, lv_obj_t** icon_labels, lv_obj_t** value_labels,
-                       lv_obj_t* bar) {
-    SortAscending(items, count);
+// Sorts ascending by magnitude, then rebinds each active slot's icon/color/value and
+// the matching flow-bar segment to its newly-assigned category. Slots beyond
+// active_count (up to max_slots) are hidden entirely — see FilterNonZero.
+void ApplySortedSlots(FlowItem* items, uint8_t active_count, uint8_t max_slots, lv_obj_t** icon_labels,
+                       lv_obj_t** value_labels, lv_obj_t* bar) {
+    SortAscending(items, active_count);
 
     float magnitudes[widgets::kFlowBarMaxSegments];
     lv_color_t bar_colors[widgets::kFlowBarMaxSegments];
     char buf[24];
 
-    for (uint8_t i = 0; i < count; ++i) {
+    for (uint8_t i = 0; i < active_count; ++i) {
         char utf8[4];
         icon::Utf8Encode(items[i].glyph, utf8);
         lv_label_set_text(icon_labels[i], utf8);
         lv_obj_set_style_text_color(icon_labels[i], items[i].color, LV_PART_MAIN);
 
-        snprintf(buf, sizeof(buf), "%.0f W", items[i].magnitude);
+        FormatPowerW(items[i].magnitude, buf, sizeof(buf));
         lv_label_set_text(value_labels[i], buf);
+        lv_obj_remove_flag(lv_obj_get_parent(icon_labels[i]), LV_OBJ_FLAG_HIDDEN);
 
         magnitudes[i] = items[i].magnitude;
         bar_colors[i] = items[i].color;
     }
-    widgets::UpdateFlowBar(bar, magnitudes, bar_colors, count);
+    for (uint8_t i = active_count; i < max_slots; ++i) {
+        lv_obj_add_flag(lv_obj_get_parent(icon_labels[i]), LV_OBJ_FLAG_HIDDEN);
+    }
+    widgets::UpdateFlowBar(bar, magnitudes, bar_colors, active_count);
 }
 
 void RefreshTick(lv_timer_t* /*timer*/) {
@@ -177,25 +212,32 @@ void RefreshTick(lv_timer_t* /*timer*/) {
     float grid_import_w = global.grid_power_w > 0 ? global.grid_power_w : 0;
     float grid_export_w = global.grid_power_w < 0 ? -global.grid_power_w : 0;
     float battery_charging_w = global.battery_power_w > 0 ? global.battery_power_w : 0;
+    float battery_discharging_w = global.battery_power_w < 0 ? -global.battery_power_w : 0;
 
     if (g_supply_bar != nullptr) {
-        FlowItem supply_items[kSupplySlots] = {
+        FlowItem supply_candidates[kSupplySlots] = {
             {icon::Glyph::kSun, colors.pv, global.pv_power_w},
-            {icon::Glyph::kPlugConnected, colors.grid, grid_import_w},
+            {icon::Glyph::kBolt, colors.grid, grid_import_w},
+            {icon::Glyph::kBattery, colors.battery, battery_discharging_w},
         };
-        ApplySortedSlots(supply_items, kSupplySlots, g_supply_icon_labels, g_supply_value_labels,
-                          g_supply_bar);
+        FlowItem supply_active[kSupplySlots];
+        uint8_t supply_count = FilterNonZero(supply_candidates, kSupplySlots, supply_active);
+        ApplySortedSlots(supply_active, supply_count, kSupplySlots, g_supply_icon_labels,
+                          g_supply_value_labels, g_supply_bar);
     }
 
     if (g_demand_bar != nullptr) {
-        FlowItem demand_items[kDemandSlots] = {
+        FlowItem demand_candidates[kDemandSlots] = {
             {icon::Glyph::kBolt, colors.chargepoint, chargepoints_total_w},
             {icon::Glyph::kBattery, colors.battery, battery_charging_w},
-            {icon::Glyph::kPlugConnected, colors.grid, grid_export_w},
-            {icon::Glyph::kHomeBolt, colors.consumer, global.consumer_power_w},
+            {icon::Glyph::kBolt, colors.grid, grid_export_w},
+            {icon::Glyph::kDroplet, colors.consumer, global.consumer_power_w},
+            {icon::Glyph::kHome, colors.muted, global.home_consumption_w},
         };
-        ApplySortedSlots(demand_items, kDemandSlots, g_demand_icon_labels, g_demand_value_labels,
-                          g_demand_bar);
+        FlowItem demand_active[kDemandSlots];
+        uint8_t demand_count = FilterNonZero(demand_candidates, kDemandSlots, demand_active);
+        ApplySortedSlots(demand_active, demand_count, kDemandSlots, g_demand_icon_labels,
+                          g_demand_value_labels, g_demand_bar);
     }
 }
 
@@ -230,7 +272,7 @@ void ShowStatusScreen(uint8_t chargepoint_count) {
 
         widgets::CreateStatusBar(screen);
 
-        CreateGlobalPanel(screen);
+        if (config::Store().Get().show_flow_chart) CreateGlobalPanel(screen);
 
         lv_obj_t* pager = widgets::CreateGesturePager(screen);
         lv_obj_set_width(pager, lv_pct(100));

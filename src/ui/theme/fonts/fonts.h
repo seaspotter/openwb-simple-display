@@ -20,11 +20,11 @@ LV_FONT_DECLARE(font_icons_24) // for touch controls (lock toggle, status bar ic
 namespace icon {
 
 enum class Glyph : uint32_t {
-    kSun = 0xEB30,           // PV
-    kPlugConnected = 0xF00A, // grid
-    kBolt = 0xEA38,          // chargepoints
-    kBattery = 0xEA34,       // battery
-    kHomeBolt = 0xF336,      // other consumers ("Verbraucher")
+    kSun = 0xEB30,     // PV
+    kBolt = 0xEA38,    // grid AND chargepoints — same shape, different colors (quartz)
+    kBattery = 0xEA34, // battery
+    kHome = 0xEAC1,    // Hausverbrauch (home base load)
+    kDroplet = 0xEA97, // Verbraucher (other consumers)
     kLock = 0xEAE2,
     kLockOpen = 0xEAE1,
     kSettings = 0xEB20,

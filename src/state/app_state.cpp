@@ -65,6 +65,50 @@ bool AppState::IsMqttConnected() const {
     return copy;
 }
 
+void AppState::SetProvisioningActive(bool active) {
+    LOCK(&lock_);
+    provisioning_active_ = active;
+    UNLOCK(&lock_);
+}
+
+bool AppState::IsProvisioningActive() const {
+    LOCK(&lock_);
+    bool copy = provisioning_active_;
+    UNLOCK(&lock_);
+    return copy;
+}
+
+void AppState::SetNetworkReady(bool ready) {
+    LOCK(&lock_);
+    network_ready_ = ready;
+    UNLOCK(&lock_);
+}
+
+bool AppState::IsNetworkReady() const {
+    LOCK(&lock_);
+    bool copy = network_ready_;
+    UNLOCK(&lock_);
+    return copy;
+}
+
+void AppState::SetPendingBrightnessSave(uint8_t percent) {
+    LOCK(&lock_);
+    pending_brightness_percent_ = percent;
+    brightness_save_pending_ = true;
+    UNLOCK(&lock_);
+}
+
+bool AppState::TryTakePendingBrightnessSave(uint8_t* out_percent) {
+    LOCK(&lock_);
+    bool had_pending = brightness_save_pending_;
+    if (had_pending) {
+        *out_percent = pending_brightness_percent_;
+        brightness_save_pending_ = false;
+    }
+    UNLOCK(&lock_);
+    return had_pending;
+}
+
 bool AppState::AnyChargepointCharging() const {
     LOCK(&lock_);
     bool any = false;

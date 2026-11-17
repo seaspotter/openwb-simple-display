@@ -41,6 +41,20 @@ public:
     void SetMqttConnected(bool connected);
     bool IsMqttConnected() const;
 
+    // Drives the UI task's boot -> provisioning/status screen transition (see
+    // lvgl_port.cpp); written by the net task, read by the UI task.
+    void SetProvisioningActive(bool active);
+    bool IsProvisioningActive() const;
+    void SetNetworkReady(bool ready);
+    bool IsNetworkReady() const;
+
+    // NVS writes block for long enough to visibly glitch the display if done on the UI
+    // task, which shares a core with rendering. The on-device settings screen sets this
+    // instead of writing to config::Store() directly; the net task (core 0, not involved
+    // in rendering) picks it up and does the actual write.
+    void SetPendingBrightnessSave(uint8_t percent);
+    bool TryTakePendingBrightnessSave(uint8_t* out_percent);
+
 private:
 #ifdef UNIT_TEST
     mutable PortMux lock_ = 0;
@@ -53,6 +67,10 @@ private:
     openwb::GlobalStatus global_{};
     uint32_t last_touch_ms_ = 0;
     bool mqtt_connected_ = false;
+    bool provisioning_active_ = false;
+    bool network_ready_ = false;
+    bool brightness_save_pending_ = false;
+    uint8_t pending_brightness_percent_ = 0;
 };
 
 // Process-wide instance, shared by the net task and the UI task.

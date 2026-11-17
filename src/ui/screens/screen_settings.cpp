@@ -8,6 +8,7 @@
 #include "board/display_driver.h"
 #include "config/config_store.h"
 #include "ota/ota_manager.h"
+#include "state/app_state.h"
 #include "ui/theme/fonts/fonts.h"
 #include "ui/theme/theme_colors.h"
 #include "ui/theme/theme_quartz.h"
@@ -20,11 +21,21 @@ namespace {
 lv_obj_t* g_ota_status_label = nullptr;
 lv_obj_t* g_install_button = nullptr;
 
+// Live preview only — fires continuously while dragging. Writing to NVS here would
+// block the UI task on a flash write on every pixel of drag, causing visible stutter.
 void OnBrightnessChanged(lv_event_t* e) {
     lv_obj_t* slider = static_cast<lv_obj_t*>(lv_event_get_target(e));
     int32_t value = lv_slider_get_value(slider);
     board::SetBacklight(static_cast<uint8_t>(value));
-    config::Store().Update([value](config::AppConfig& c) { c.brightness_pct = static_cast<uint8_t>(value); });
+}
+
+// Persists once the drag ends — handed to the net task (see net_task.cpp), not written
+// here directly: the NVS write itself blocks for long enough to glitch the display if
+// done on this task, which shares a core with rendering.
+void OnBrightnessReleased(lv_event_t* e) {
+    lv_obj_t* slider = static_cast<lv_obj_t*>(lv_event_get_target(e));
+    int32_t value = lv_slider_get_value(slider);
+    state::State().SetPendingBrightnessSave(static_cast<uint8_t>(value));
 }
 
 void OnBackTapped(lv_event_t* e) {
@@ -130,6 +141,7 @@ void ShowSettingsScreen() {
     lv_slider_set_range(brightness_slider, 10, 100);
     lv_slider_set_value(brightness_slider, cfg.brightness_pct, LV_ANIM_OFF);
     lv_obj_add_event_cb(brightness_slider, OnBrightnessChanged, LV_EVENT_VALUE_CHANGED, nullptr);
+    lv_obj_add_event_cb(brightness_slider, OnBrightnessReleased, LV_EVENT_RELEASED, nullptr);
 
     // Firmware.
     lv_obj_t* fw_card = CreateCard(screen, "FIRMWARE", colors);

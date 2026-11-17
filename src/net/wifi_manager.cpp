@@ -4,6 +4,7 @@
 
 #include "app_config_build.h"
 #include "config/config_store.h"
+#include "state/app_state.h"
 #include "util/logging.h"
 
 namespace net {
@@ -37,6 +38,10 @@ void Provision() {
     wm.addParameter(&port_param);
     wm.addParameter(&username_param);
     wm.addParameter(&password_param);
+
+    // Fires only if there's no saved WiFi to connect to directly — tells the UI task
+    // (lvgl_port.cpp) to show the provisioning screen instead of staying on "Verbinde...".
+    wm.setAPCallback([](WiFiManager*) { state::State().SetProvisioningActive(true); });
 
     String ap_ssid = String(cfg.device_name) + AP_SSID_SUFFIX;
     bool connected = wm.autoConnect(ap_ssid.c_str());

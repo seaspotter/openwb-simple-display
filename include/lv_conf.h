@@ -40,4 +40,8 @@
 #define LV_USE_LOG 1
 #define LV_LOG_LEVEL LV_LOG_LEVEL_WARN
 
+// Default (10px) made the chargepoint swipe pager feel like it took a noticeable beat
+// to start following the finger; lower = it starts moving right away.
+#define LV_INDEV_DEF_SCROLL_LIMIT 3
+
 #endif // LV_CONF_H

@@ -74,6 +74,8 @@ inline bool ParseGlobalTopic(const char* topic, const char* payload, GlobalStatu
         out.battery_soc_percent = static_cast<float>(atof(payload));
     } else if (strcmp(topic, "openWB/consumer/get/power") == 0) {
         out.consumer_power_w = static_cast<float>(atof(payload));
+    } else if (strcmp(topic, "openWB/simpleAPI/counter/set/home_consumption") == 0) {
+        out.home_consumption_w = static_cast<float>(atof(payload));
     } else if (strcmp(topic, "openWB/simpleAPI/counter/get/power") == 0) {
         out.grid_power_w = static_cast<float>(atof(payload)); // assumes lowest id is the grid root
     } else {

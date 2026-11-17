@@ -20,6 +20,11 @@ constexpr char kTag[] = "openwb_mqtt";
 constexpr char kSimpleApiChargepointPrefix[] = "openWB/simpleAPI/chargepoint/";
 constexpr char kRawChargepointPrefix[] = "openWB/chargepoint/";
 constexpr uint32_t kReconnectIntervalMs = 5000;
+// openWB/chargepoint/<id>/set/log's JSON payload (charging session totals) runs well
+// past 256 bytes on a real install with charging history — measured ~800 bytes live.
+// Must match the PubSubClient buffer set via setBufferSize() below, or the real MQTT
+// packet arrives intact but gets truncated again by our own local copy of it.
+constexpr size_t kMqttBufferSize = 1200;
 
 WiFiClient g_plain_client;
 WiFiClientSecure g_secure_client;
@@ -37,6 +42,11 @@ int SlotForChargepointId(uint8_t id) {
 void HandleChargepointMessage(uint8_t id, const char* suffix, const char* payload) {
     int slot = SlotForChargepointId(id);
     if (slot < 0) return;
+
+    // TEMP DIAGNOSTIC — remove once the name cross-contamination bug is found.
+    if (strcmp(suffix, "config/name") == 0) {
+        Serial.printf("[name-debug] topic-id=%u slot=%d payload=\"%s\"\n", id, slot, payload);
+    }
 
     openwb::ChargepointStatus status = state::State().GetChargepointStatus(static_cast<uint8_t>(slot));
     if (!ParseChargepointField(suffix, payload, status)) return; // unrecognized suffix
@@ -76,7 +86,7 @@ bool ParseIdAfterPrefix(const char* topic, const char* prefix, uint8_t* out_id, 
 }
 
 void OnMessage(char* topic, uint8_t* payload_bytes, unsigned int length) {
-    char payload[256];
+    char payload[kMqttBufferSize];
     size_t copy_len = length < sizeof(payload) - 1 ? length : sizeof(payload) - 1;
     memcpy(payload, payload_bytes, copy_len);
     payload[copy_len] = '\0';
@@ -102,6 +112,7 @@ void Subscribe() {
     g_mqtt.subscribe("openWB/bat/get/soc");
     g_mqtt.subscribe("openWB/consumer/get/power");
     g_mqtt.subscribe("openWB/simpleAPI/counter/get/power");
+    g_mqtt.subscribe("openWB/simpleAPI/counter/set/home_consumption");
 
     for (uint8_t i = 0; i < cfg.chargepoint_count && i < config::AppConfig::kMaxChargepoints; ++i) {
         char topic[48];
@@ -123,7 +134,7 @@ bool Connect() {
     g_mqtt.setClient(*net_client);
     g_mqtt.setServer(cfg.mqtt_host, cfg.mqtt_port);
     g_mqtt.setCallback(OnMessage);
-    g_mqtt.setBufferSize(512); // default 256 is too small for state_str/set-log payloads
+    g_mqtt.setBufferSize(kMqttBufferSize);
 
     char client_id[40];
     snprintf(client_id, sizeof(client_id), "%s-%08x", cfg.device_name,

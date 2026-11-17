@@ -15,7 +15,8 @@ AsyncWebServer g_server(80);
 } // namespace
 
 void InitServer() {
-    if (!LittleFS.begin()) {
+    // Default partition label is "spiffs"; partitions.csv names ours "littlefs".
+    if (!LittleFS.begin(false, "/littlefs", 10, "littlefs")) {
         util::LogError(kTag, "LittleFS mount failed — static web assets unavailable");
     }
 

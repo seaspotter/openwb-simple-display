@@ -94,6 +94,7 @@ void HandleGetConfig(AsyncWebServerRequest* request) {
     doc["screen_timeout_s"] = cfg.screen_timeout_s;
     doc["rotation"] = cfg.rotation;
     doc["dark_mode"] = cfg.dark_mode;
+    doc["show_flow_chart"] = cfg.show_flow_chart;
     doc["ota_auto_check"] = cfg.ota_auto_check;
     doc["ota_manifest_url"] = cfg.ota_manifest_url;
 
@@ -119,6 +120,7 @@ bool HandlePostConfig(AsyncWebServerRequest* request, JsonVariant& json) {
         if (body["screen_timeout_s"].is<int>()) c.screen_timeout_s = body["screen_timeout_s"];
         if (body["rotation"].is<int>()) c.rotation = body["rotation"];
         if (body["dark_mode"].is<bool>()) c.dark_mode = body["dark_mode"];
+        if (body["show_flow_chart"].is<bool>()) c.show_flow_chart = body["show_flow_chart"];
         if (body["ota_auto_check"].is<bool>()) c.ota_auto_check = body["ota_auto_check"];
         if (body["ota_manifest_url"].is<const char*>())
             strlcpy(c.ota_manifest_url, body["ota_manifest_url"], sizeof(c.ota_manifest_url));
@@ -153,6 +155,16 @@ void HandleWifiReset(AsyncWebServerRequest* request) {
     // Must respond before ResetAndReprovision(), which reboots the device.
     request->send(200, "application/json", "{\"success\":true}");
     net::ResetAndReprovision();
+}
+
+void HandleRestart(AsyncWebServerRequest* request) {
+    if (!CheckAuth(request)) return;
+    // Must respond before restarting — unlike /api/wifi/reset, this keeps WiFi/MQTT
+    // config as-is; it's just how config changes (e.g. chargepoint_ids) take effect
+    // without a physical power-cycle.
+    request->send(200, "application/json", "{\"success\":true}");
+    delay(300);
+    ESP.restart();
 }
 
 void HandleGetInfo(AsyncWebServerRequest* request) {
@@ -211,6 +223,7 @@ void RegisterApiRoutes(AsyncWebServer& server) {
     server.on("/api/ota/start", HTTP_POST, HandleOtaStart);
     server.on("/api/ota/progress", HTTP_GET, HandleOtaProgress);
     server.on("/api/wifi/reset", HTTP_POST, HandleWifiReset);
+    server.on("/api/restart", HTTP_POST, HandleRestart);
 
     auto* config_post_handler = new AsyncCallbackJsonWebHandler(
         "/api/config",

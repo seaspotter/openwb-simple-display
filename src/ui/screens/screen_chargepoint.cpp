@@ -173,7 +173,7 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     lv_label_set_long_mode(widgets->status_box_label, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(widgets->status_box_label, lv_pct(100));
     lv_obj_set_style_text_font(widgets->status_box_label, &font_sans_14, LV_PART_MAIN);
-    lv_obj_set_style_text_color(widgets->status_box_label, colors.accent, LV_PART_MAIN);
+    lv_obj_set_style_text_color(widgets->status_box_label, colors.text, LV_PART_MAIN);
     lv_label_set_text(widgets->status_box_label, "-");
 
     // Connected vehicle + SoC.

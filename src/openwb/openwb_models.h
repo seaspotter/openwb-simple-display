@@ -12,7 +12,7 @@ struct ChargepointStatus {
     float power_w = 0;
     bool plugged = false;
     bool charging = false;
-    char state_str[48] = "";
+    char state_str[96] = ""; // real messages can include a live countdown, e.g. "...in 19 Sek."
     char fault_str[64] = "";
     uint8_t fault_state = 0;
 
@@ -31,16 +31,15 @@ struct ChargepointStatus {
     uint32_t last_update_ms = 0;
 };
 
-// "Zähler" (additional sub-metering counters) isn't modeled — install-specific, not
-// every setup has one. If added: quartz colors it as Palette::grid, no dedicated token.
 struct GlobalStatus {
     bool valid = false;
 
     float pv_power_w = 0;
     float grid_power_w = 0;
     float battery_power_w = 0;
-    float battery_soc_percent = -1; // -1 = no battery configured
-    float consumer_power_w = 0;     // "Verbraucher"
+    float battery_soc_percent = -1;   // -1 = no battery configured
+    float consumer_power_w = 0;       // "Verbraucher" (other switchable consumer devices)
+    float home_consumption_w = 0;     // "Hausverbrauch" (unmeasured household base load)
 
     uint32_t last_update_ms = 0;
 };

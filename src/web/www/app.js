@@ -22,8 +22,10 @@ async function loadConfig() {
   document.getElementById("mqtt_port").value = cfg.mqtt_port || 1883;
   document.getElementById("mqtt_username").value = cfg.mqtt_username || "";
   document.getElementById("mqtt_use_tls").value = String(cfg.mqtt_use_tls);
+  document.getElementById("chargepoint_ids").value = (cfg.chargepoint_ids || []).join(", ");
   document.getElementById("brightness_pct").value = cfg.brightness_pct;
   document.getElementById("screen_timeout_s").value = cfg.screen_timeout_s;
+  document.getElementById("show_flow_chart").value = String(cfg.show_flow_chart);
   document.getElementById("dark_mode").value = String(cfg.dark_mode);
   document.documentElement.setAttribute("data-theme", cfg.dark_mode ? "dark" : "light");
   document.getElementById("pin-status").textContent = cfg.has_web_ui_pin ? "Aktiv" : "Deaktiviert";
@@ -60,22 +62,50 @@ async function loadInfo() {
   document.getElementById("fw-version").textContent = info.firmware_version;
 }
 
-async function saveSettings() {
+function readSettingsForm() {
+  const chargepointIds = document
+    .getElementById("chargepoint_ids")
+    .value.split(",")
+    .map((s) => parseInt(s.trim(), 10))
+    .filter((n) => !isNaN(n))
+    .slice(0, 4);
+
   const body = {
     mqtt_host: document.getElementById("mqtt_host").value,
     mqtt_port: parseInt(document.getElementById("mqtt_port").value, 10),
     mqtt_username: document.getElementById("mqtt_username").value,
     mqtt_use_tls: document.getElementById("mqtt_use_tls").value === "true",
+    chargepoint_ids: chargepointIds,
     brightness_pct: parseInt(document.getElementById("brightness_pct").value, 10),
     screen_timeout_s: parseInt(document.getElementById("screen_timeout_s").value, 10),
+    show_flow_chart: document.getElementById("show_flow_chart").value === "true",
     dark_mode: document.getElementById("dark_mode").value === "true",
   };
   const password = document.getElementById("mqtt_password").value;
   if (password) body.mqtt_password = password;
+  return body;
+}
 
+async function saveSettings() {
+  const body = readSettingsForm();
   const res = await postJson("/api/config", body);
   showToast(res.ok ? "Gespeichert." : "Einstellungen konnten nicht gespeichert werden.");
   document.documentElement.setAttribute("data-theme", body.dark_mode ? "dark" : "light");
+}
+
+async function saveAndRestart() {
+  const body = readSettingsForm();
+  const res = await postJson("/api/config", body);
+  if (!res.ok) {
+    showToast("Einstellungen konnten nicht gespeichert werden.");
+    return;
+  }
+  showToast("Gespeichert — Neustart...");
+  try {
+    await fetch("/api/restart", { method: "POST" });
+  } catch (e) {
+    // Expected: the device reboots right after responding.
+  }
 }
 
 let lastCheckHadUpdate = false;
@@ -140,6 +170,7 @@ async function resetWifi() {
 }
 
 document.getElementById("save-btn").addEventListener("click", saveSettings);
+document.getElementById("save-restart-btn").addEventListener("click", saveAndRestart);
 document.getElementById("check-update-btn").addEventListener("click", checkForUpdate);
 document.getElementById("install-update-btn").addEventListener("click", installUpdate);
 document.getElementById("reset-wifi-btn").addEventListener("click", resetWifi);
