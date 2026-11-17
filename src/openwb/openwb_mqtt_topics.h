@@ -39,7 +39,11 @@ inline bool ParseChargepointField(const char* suffix, const char* payload, Charg
         CopyString(out.chargemode, sizeof(out.chargemode), payload);
     } else if (strcmp(suffix, "soc/soc") == 0) {
         out.soc_percent = static_cast<float>(atof(payload));
-    } else if (strcmp(suffix, "soc/range") == 0) {
+    } else if (strcmp(suffix, "soc/range_charged") == 0) {
+        // Not "soc/range" (the vehicle's absolute total range, e.g. 153 km) — quartz's
+        // "+X km" is the range gained since plugged in, confirmed live via
+        // openWB/chargepoint/<id>/set/log's own "range_charged" field (same shape as
+        // "imported_since_plugged" for energy).
         out.range_km = static_cast<float>(atof(payload));
     } else if (strcmp(suffix, "vehicle_name") == 0) {
         CopyString(out.connected_vehicle_name, sizeof(out.connected_vehicle_name), payload);

@@ -22,7 +22,8 @@ struct ChargepointStatus {
     char chargemode[24] = ""; // "instant_charging" | "pv_charging" | "eco_charging" |
                                // "scheduled_charging" | "stop"
     float soc_percent = -1;   // -1 = unknown
-    float range_km = -1;      // "Reichweite"; -1 = unknown
+    float range_km = -1;      // "Reichweite" — range gained since plugged in, not the
+                               // vehicle's absolute total range; -1 = unknown
     char connected_vehicle_name[48] = "";
 
     uint8_t phases_in_use = 0;
