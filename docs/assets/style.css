@@ -8,9 +8,11 @@
     --accent: #2563eb;
     --accent-tint: rgba(37, 99, 235, 0.12);
     --pv: #1f9d55;
+    --grid: #dc2626;
     --chargepoint: #2563eb;
     --battery: #eab308;
     --car: #0d9488;
+    --consumer: #7c3aed;
     --radius: 14px;
 }
 
@@ -23,9 +25,11 @@
         --muted: #9aa0ac;
         --accent-tint: rgba(91, 155, 255, 0.16);
         --pv: #3ec776;
+        --grid: #f87171;
         --chargepoint: #5b9bff;
         --battery: #facc15;
         --car: #2dd4bf;
+        --consumer: #a78bfa;
     }
 }
 
@@ -139,6 +143,7 @@ p.subtitle {
 .feature-list li:nth-child(2) { --dot: var(--chargepoint); }
 .feature-list li:nth-child(3) { --dot: var(--car); }
 .feature-list li:nth-child(4) { --dot: var(--battery); }
+.feature-list li:nth-child(5) { --dot: var(--accent); }
 
 .steps {
     list-style: none;
@@ -263,4 +268,83 @@ code {
     padding: 2px 6px;
     border-radius: 4px;
     font-size: 0.875em;
+}
+
+.back-link {
+    display: inline-block;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.875rem;
+    margin-bottom: 24px;
+}
+
+.back-link:hover {
+    color: var(--accent);
+}
+
+.legend {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 10px;
+}
+
+.legend li {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.legend li + li {
+    margin-top: 0;
+}
+
+.legend .dot {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--dot, var(--accent));
+    transform: translateY(-1px);
+}
+
+.legend strong {
+    font-weight: 600;
+}
+
+.toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin: 0 0 32px;
+    padding: 0;
+    list-style: none;
+}
+
+.toc a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.8125rem;
+}
+
+.toc a:hover {
+    color: var(--accent);
+}
+
+h3 {
+    font-size: 0.95rem;
+    margin: 24px 0 8px;
+}
+
+.panel h3:first-child {
+    margin-top: 0;
+}
+
+.note {
+    background: var(--accent-tint);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 0.875rem;
+    margin: 12px 0 0;
 }

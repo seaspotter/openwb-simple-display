@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Anleitung — openWB Simple Display</title>
+<meta name="description" content="Installation, Einrichtung und vollständige Bedienungsanleitung für das openWB Simple Display." />
+<link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+<main>
+  <a class="back-link" href="../">&larr; Zur Startseite</a>
+  <h1>Anleitung</h1>
+  <p class="subtitle">
+    Installation, Ersteinrichtung und eine vollständige Erklärung aller Symbole,
+    Einstellungen und Bedienelemente von Display und Weboberfläche.
+  </p>
+
+  <ul class="toc">
+    <li><a href="#installation">Installation</a></li>
+    <li><a href="#einrichtung">Ersteinrichtung</a></li>
+    <li><a href="#statusleiste">Statusleiste</a></li>
+    <li><a href="#flow">Energiefluss-Diagramm</a></li>
+    <li><a href="#ladepunktkarte">Ladepunkt-Karte</a></li>
+    <li><a href="#popup">Einstellungen-Popup</a></li>
+    <li><a href="#display-einstellungen">Einstellungen am Display</a></li>
+    <li><a href="#wlan-reset">WLAN zurücksetzen</a></li>
+    <li><a href="#update">Firmware-Updates</a></li>
+    <li><a href="#weboberflaeche">Weboberfläche</a></li>
+    <li><a href="#pin">PIN-Schutz</a></li>
+    <li><a href="#darstellung">Hell/Dunkel &amp; automatischer Wechsel</a></li>
+  </ul>
+
+  <section class="panel" id="installation">
+    <h2>Installation</h2>
+    <p>Die Firmware wird direkt im Browser geflasht — mit Chrome oder Edge, ohne
+      Software-Installation. Die ausführlichen Schritte stehen auf der
+      <a href="../#installation">Startseite</a>; kurz zusammengefasst:</p>
+    <ol class="steps">
+      <li>Display per USB-C-<strong>Datenkabel</strong> an den Computer anschließen.</li>
+      <li>Auf der Startseite „Firmware installieren" öffnen und den seriellen Port
+        auswählen.</li>
+      <li>„Install" wählen und ca. 1–2 Minuten warten.</li>
+    </ol>
+  </section>
+
+  <section class="panel" id="einrichtung">
+    <h2>Ersteinrichtung</h2>
+    <p>Nach dem Flashen braucht das Display nur zwei Angaben, um zu funktionieren:</p>
+    <ol class="steps">
+      <li><strong>WLAN-Zugangsdaten.</strong> Das Display zeigt nach dem ersten Start ein
+        eigenes WLAN namens <code>openwb-simple-display-setup</code>. Damit verbinden, der
+        sich öffnende Einrichtungsassistent fragt nach dem eigenen WLAN-Passwort.</li>
+      <li><strong>Die IP-Adresse (oder der Hostname) des openWB-MQTT-Brokers</strong> —
+        im selben Assistenten einzutragen, meist einfach die IP der openWB-Box selbst.
+        Port, Benutzername und Passwort können i.&nbsp;d.&nbsp;R. leer bleiben
+        (Standardinstallation: Port 1883, anonymer Zugriff).</li>
+      <li><strong>Die Ladepunkt-ID(s)</strong> — welche(n) Ladepunkt(e) aus der eigenen
+        openWB-Installation das Display anzeigen soll (bis zu 4). Zu finden in der
+        openWB-Oberfläche selbst, z.&nbsp;B. unter „Ladepunkte konfigurieren".</li>
+    </ol>
+    <p>Das war's. Das Display startet neu, verbindet sich und zeigt innerhalb weniger
+      Sekunden Live-Daten. Alles Weitere (Helligkeit, Darstellung, PIN, …) sind optionale
+      Feineinstellungen, keine Voraussetzungen.</p>
+    <p><small>Ladepunkt-ID(s) und MQTT-Broker lassen sich jederzeit nachträglich in der
+      <a href="#weboberflaeche">Weboberfläche</a> ändern.</small></p>
+  </section>
+
+  <section class="panel" id="statusleiste">
+    <h2>Statusleiste (oben am Display)</h2>
+    <p>Von links nach rechts: Uhrzeit, dann bis zu drei Symbole, die nur erscheinen, wenn
+      sie etwas zu melden haben:</p>
+    <ul class="legend">
+      <li><span class="dot" style="--dot: var(--grid)"></span>
+        <span><strong>WLAN-Symbol</strong> — grau, wenn verbunden; rot und durchgestrichen,
+        wenn die Verbindung fehlt.</span></li>
+      <li><span class="dot" style="--dot: var(--accent)"></span>
+        <span><strong>Download-Wolke</strong> — erscheint nur, wenn eine neue
+        Firmware-Version gefunden wurde (automatisch oder manuell geprüft). Antippen des
+        Zahnrads daneben führt zu den Einstellungen, wo das Update installiert werden
+        kann.</span></li>
+      <li><span class="dot" style="--dot: var(--grid)"></span>
+        <span><strong>Warndreieck</strong> — erscheint, wenn ein konfigurierter Ladepunkt
+        einen Fehler meldet.</span></li>
+      <li><span class="dot" style="--dot: var(--muted)"></span>
+        <span><strong>Zahnrad</strong> — öffnet die <a href="#display-einstellungen">Einstellungen
+        am Display</a>.</span></li>
+    </ul>
+  </section>
+
+  <section class="panel" id="flow">
+    <h2>Energiefluss-Diagramm</h2>
+    <p>Nur sichtbar, wenn mehr als ein Ladepunkt konfiguriert ist (bei einem einzelnen
+      Ladepunkt nimmt dessen Karte den ganzen Bildschirm ein). Zwei Balken: oben, woher
+      die Energie gerade kommt, unten, wohin sie fließt. Beide zeigen nur Kategorien mit
+      einem Wert über null — jede sortiert sich bei jeder Aktualisierung neu von klein
+      nach groß ein, die Position einer Kategorie ist also nicht fest.</p>
+    <div class="screenshots">
+      <figure>
+        <img src="../assets/screenshot-multi-light.png" alt="Energiefluss-Diagramm über mehreren Ladepunkt-Karten" />
+        <figcaption>Energiefluss + Ladepunkt-Pager</figcaption>
+      </figure>
+    </div>
+    <h3>Oberer Balken — Erzeugung/Bezug</h3>
+    <ul class="legend">
+      <li><span class="dot" style="--dot: var(--pv)"></span>
+        <span><strong>Sonne</strong> — PV-Erzeugung</span></li>
+      <li><span class="dot" style="--dot: var(--grid)"></span>
+        <span><strong>Blitz</strong> — Netzbezug</span></li>
+      <li><span class="dot" style="--dot: var(--battery)"></span>
+        <span><strong>Batterie</strong> — Speicher-Entladung</span></li>
+    </ul>
+    <h3>Unterer Balken — Verbrauch</h3>
+    <ul class="legend">
+      <li><span class="dot" style="--dot: var(--chargepoint)"></span>
+        <span><strong>Blitz</strong> — Summe aller Ladepunkte (dieselbe Form wie Netzbezug
+        oben, andere Farbe — wie im openWB-Quartz-Theme)</span></li>
+      <li><span class="dot" style="--dot: var(--battery)"></span>
+        <span><strong>Batterie</strong> — Speicher-Beladung</span></li>
+      <li><span class="dot" style="--dot: var(--grid)"></span>
+        <span><strong>Blitz</strong> — Netzeinspeisung (Überschuss)</span></li>
+      <li><span class="dot" style="--dot: var(--consumer)"></span>
+        <span><strong>Tropfen</strong> — Verbraucher (sonstige schaltbare Geräte)</span></li>
+      <li><span class="dot" style="--dot: var(--muted)"></span>
+        <span><strong>Haus</strong> — Hausverbrauch (nicht separat gemessene Grundlast)</span></li>
+      <li><span class="dot" style="--dot: var(--grid)"></span>
+        <span><strong>Zähler</strong> — Summe zusätzlicher, automatisch erkannter
+        Unterzähler jenseits des Netz-Hauptzählers</span></li>
+    </ul>
+    <p><small>EVU (Netz) und Zähler sind bewusst nicht zusammengefasst: openWB kann sie
+      intern nicht sauber trennen, deshalb zeigt auch die openWB-Oberfläche selbst sie
+      getrennt an.</small></p>
+  </section>
+
+  <section class="panel" id="ladepunktkarte">
+    <h2>Die Ladepunkt-Karte</h2>
+    <div class="screenshots">
+      <figure>
+        <img src="../assets/screenshot-light.png" alt="Ladepunkt-Karte, helles Design" />
+        <figcaption>Hell</figcaption>
+      </figure>
+      <figure>
+        <img src="../assets/screenshot-dark.png" alt="Ladepunkt-Karte, dunkles Design" />
+        <figcaption>Dunkel</figcaption>
+      </figure>
+    </div>
+    <h3>Kopfzeile</h3>
+    <ul class="legend">
+      <li><span class="dot" style="--dot: var(--chargepoint)"></span>
+        <span><strong>Name</strong> des Ladepunkts (fett, links)</span></li>
+      <li><span class="dot" style="--dot: var(--pv)"></span>
+        <span><strong>Schloss-Symbol</strong> — grün = entsperrt, rot = gesperrt. Antippen
+        schaltet um.</span></li>
+      <li><span class="dot" style="--dot: var(--muted)"></span>
+        <span><strong>Zahnrad</strong> — öffnet das <a href="#popup">Einstellungen-Popup</a>
+        für den aktuell gewählten Lademodus.</span></li>
+      <li><span class="dot" style="--dot: var(--pv)"></span>
+        <span><strong>Status-Badge</strong> (rechts) — „Lädt" (grün), „Angesteckt, wartet",
+        „Nicht angesteckt" oder „Gesperrt" (rot, hat Vorrang vor allem anderen).</span></li>
+    </ul>
+    <h3>Statusmeldung</h3>
+    <p>Die blau hinterlegte Box zeigt openWBs eigene Statusmeldung zum Ladepunkt
+      wörtlich — z.&nbsp;B. den Grund, warum gerade (nicht) geladen wird, oder einen
+      Hinweis zum aktuellen Strompreis bei Eco-Laden. Dieser Text kommt unverändert aus
+      openWB, das Display dichtet nichts dazu.</p>
+    <h3>Fahrzeugzeile</h3>
+    <p>Auto-Symbol, Fahrzeugname und Ladestand (SoC) des aktuell angesteckten Fahrzeugs.</p>
+    <h3>Lademodus-Schalter</h3>
+    <p>Sofort / PV / Ziel / Eco / Stop — Antippen wechselt den Lademodus sofort.</p>
+    <h3>Statistikzeile</h3>
+    <p>Bis zu sechs Werte, von links nach rechts jeweils an fester Position (Werte ohne
+      Inhalt bleiben als leere Lücke bestehen, damit die anderen nicht wandern):</p>
+    <ul class="legend">
+      <li><span class="dot" style="--dot: var(--chargepoint)"></span>
+        <span><strong>Leistung</strong> — aktuelle Ladeleistung, unter 1000&nbsp;W in Watt,
+        darüber in kW</span></li>
+      <li><span class="dot" style="--dot: var(--chargepoint)"></span>
+        <span><strong>Phasen</strong> — Anzahl genutzter Phasen (z.&nbsp;B. „3~")</span></li>
+      <li><span class="dot" style="--dot: var(--chargepoint)"></span>
+        <span><strong>Strom</strong> — aktueller, tatsächlich gemessener Ladestrom in
+        Ampere (nicht der eingestellte Zielwert)</span></li>
+      <li><span class="dot" style="--dot: var(--chargepoint)"></span>
+        <span><strong>Geladen</strong> — Energiemenge seit dem Anstecken</span></li>
+      <li><span class="dot" style="--dot: var(--battery)"></span>
+        <span><strong>Ziel</strong> (Zielscheiben-Symbol) — nur sichtbar, wenn eine
+        Ladebegrenzung (SoC oder Menge) aktiv ist; zeigt deren Zielwert</span></li>
+      <li><span class="dot" style="--dot: var(--car)"></span>
+        <span><strong>Reichweite</strong> — nur sichtbar während des Ladens mit einem Wert
+        über 0; die seit dem Anstecken <em>hinzugewonnene</em> Reichweite, nicht die
+        Gesamtreichweite des Fahrzeugs</span></li>
+    </ul>
+  </section>
+
+  <section class="panel" id="popup">
+    <h2>Einstellungen-Popup</h2>
+    <p>Über das Zahnrad an der Ladepunkt-Karte, mit Inhalt je nach aktuellem Lademodus.
+      Das Popup ist <strong>bewusst</strong> auf genau die Felder beschränkt, die
+      openWBs eigene <code>simpleAPI</code> zum Schreiben anbietet — keine Zeitpläne,
+      keine Fahrzeugzuordnung, keine PV-Mindeststromstärken und Ähnliches. Für alles
+      darüber hinaus bleibt die openWB-Oberfläche selbst die richtige Stelle; dieses
+      Display ist bewusst kein Ersatz dafür, sondern eine schnelle Wand-Bedienung für die
+      häufigsten Handgriffe.</p>
+    <div class="screenshots">
+      <figure>
+        <img src="../assets/screenshot-popup-instant.png" alt="Einstellungen-Popup für Sofortladen" />
+        <figcaption>Sofortladen</figcaption>
+      </figure>
+      <figure>
+        <img src="../assets/screenshot-popup-pv.png" alt="Einstellungen-Popup für PV-Laden" />
+        <figcaption>PV-Laden</figcaption>
+      </figure>
+      <figure>
+        <img src="../assets/screenshot-popup-eco.png" alt="Einstellungen-Popup für Eco-Laden" />
+        <figcaption>Eco-Laden</figcaption>
+      </figure>
+    </div>
+    <h3>Sofortladen</h3>
+    <p><strong>Ladestrom</strong> (6–32&nbsp;A, per +/-) sowie eine
+      <strong>Ladebegrenzung</strong>: Keine, SoC (Ziel-Ladestand in %) oder Menge
+      (1–50&nbsp;kWh — dieser Bereich ist durch openWBs eigene simpleAPI vorgegeben,
+      keine eigene Einschränkung dieses Displays).</p>
+    <h3>PV-Laden</h3>
+    <p>Dieselbe Ladebegrenzung (Keine/SoC/Menge) wie bei Sofortladen; der Ladestrom wird
+      bei PV-Laden von openWB selbst automatisch geregelt und ist hier deshalb nicht
+      einstellbar.</p>
+    <h3>Eco-Laden</h3>
+    <p><strong>Maximaler Strompreis</strong> in ct/kWh, in Zehntel-Cent-Schritten
+      (fein) oder Ein-Cent-Schritten (grob) einstellbar.</p>
+    <p><strong>Ziel</strong> und <strong>Stop</strong> haben aktuell kein eigenes
+      Einstellungs-Popup.</p>
+  </section>
+
+  <section class="panel" id="display-einstellungen">
+    <h2>Einstellungen am Display</h2>
+    <p>Über das Zahnrad in der Statusleiste. Bewusst auf wenige, häufig gebrauchte
+      Einstellungen beschränkt — alles andere (MQTT-Broker, Ladepunkt-IDs,
+      Bildschirm-Timeout, PIN, …) ist der <a href="#weboberflaeche">Weboberfläche</a>
+      vorbehalten, die dafür den bequemeren Eingabeweg bietet.</p>
+    <div class="screenshots">
+      <figure>
+        <img src="../assets/screenshot-display-settings.png" alt="Einstellungen direkt am Display" />
+        <figcaption>Einstellungen am Display</figcaption>
+      </figure>
+    </div>
+    <ul class="legend">
+      <li><span class="dot" style="--dot: var(--chargepoint)"></span>
+        <span><strong>Display Helligkeit</strong> — per +/- in 5-%-Schritten</span></li>
+      <li><span class="dot" style="--dot: var(--chargepoint)"></span>
+        <span><strong>Firmware</strong> — aktuelle Version sowie „Auf Update prüfen"</span></li>
+      <li><span class="dot" style="--dot: var(--grid)"></span>
+        <span><strong>WLAN zurücksetzen</strong> — siehe <a href="#wlan-reset">unten</a></span></li>
+    </ul>
+  </section>
+
+  <section class="panel" id="wlan-reset">
+    <h2>WLAN zurücksetzen</h2>
+    <p>Drei gleichwertige Wege, je nachdem, was gerade erreichbar ist:</p>
+    <ol class="steps">
+      <li><strong>Langer Druck</strong> auf die Statusleiste bzw. das Energiefluss-Feld
+        oben am Display — funktioniert immer, auch wenn weder WLAN noch Weboberfläche
+        erreichbar sind.</li>
+      <li>Button „WLAN zurücksetzen" in den <a href="#display-einstellungen">Einstellungen
+        am Display</a>.</li>
+      <li>Button „WLAN zurücksetzen" in der <a href="#weboberflaeche">Weboberfläche</a> —
+        nur nutzbar, solange diese noch erreichbar ist.</li>
+    </ol>
+    <p>In allen drei Fällen: eine Sicherheitsabfrage, dann startet das Display neu und
+      zeigt wieder das Einrichtungs-WLAN <code>openwb-simple-display-setup</code> — die
+      <a href="#einrichtung">Ersteinrichtung</a> beginnt von vorn.</p>
+  </section>
+
+  <section class="panel" id="update">
+    <h2>Firmware-Updates</h2>
+    <p>Prüfung und Installation sind getrennt: eine automatische Prüfung im Hintergrund
+      (standardmäßig alle 6&nbsp;Stunden, abschaltbar in der Weboberfläche) zeigt bei
+      einem Fund nur ein Symbol in der Statusleiste — sie <strong>installiert nie von
+      selbst</strong>. Installiert wird immer explizit:</p>
+    <ol class="steps">
+      <li>„Auf Update prüfen" am Display oder in der Weboberfläche antippen (oder
+        einfach auf das automatisch erschienene Symbol reagieren).</li>
+      <li>Wird eine neuere Version gefunden, erscheint „Update installieren".</li>
+      <li>Lädt gerade ein Ladepunkt, kommt eine Rückfrage, ob trotzdem installiert werden
+        soll.</li>
+      <li>Nach der Installation startet das Display automatisch mit der neuen Version
+        neu.</li>
+    </ol>
+    <p><small>Jede neue Version wird erst nach einem erfolgreichen ersten Start und einer
+      erfolgreichen MQTT-Verbindung als gültig markiert — scheitert beides, springt das
+      Display beim nächsten Neustart automatisch auf die vorherige Version zurück.</small></p>
+  </section>
+
+  <section class="panel" id="weboberflaeche">
+    <h2>Weboberfläche</h2>
+    <p>Erreichbar über <code>http://openwb-simple-display.local</code> (oder die
+      IP-Adresse, falls <code>.local</code> im eigenen Netzwerk nicht funktioniert — die
+      zeigen sowohl die <a href="#display-einstellungen">Einstellungen am Display</a> als
+      auch die Geräte-Status-Seite weiter unten). Hier liegen alle Einstellungen, die
+      selten geändert werden oder mehr
+      Eingabe brauchen, als am Display bequem ist.</p>
+    <div class="screenshots">
+      <figure>
+        <img src="../assets/screenshot-web-ui.png" alt="Weboberfläche, helles Design" />
+        <figcaption>Hell</figcaption>
+      </figure>
+      <figure>
+        <img src="../assets/screenshot-web-ui-dark.png" alt="Weboberfläche, dunkles Design" />
+        <figcaption>Dunkel</figcaption>
+      </figure>
+    </div>
+    <p>Das Hell/Dunkel-Umschalten oben rechts betrifft nur <em>diese Webseite</em> in
+      diesem Browser (gemerkt per Browser, nicht am Gerät gespeichert) — unabhängig von
+      der „Darstellung" des Displays selbst weiter unten.</p>
+    <h3>MQTT-Broker (openWB)</h3>
+    <p>Host/IP, Port, optional Benutzername/Passwort und TLS, sowie die
+      Ladepunkt-ID(s) — die einzigen wirklich notwendigen Angaben, siehe
+      <a href="#einrichtung">Ersteinrichtung</a>.</p>
+    <h3>Display</h3>
+    <p>Helligkeit, Bildschirm-Timeout (Sekunden Inaktivität bis zum Abdunkeln, 0 = nie),
+      Energiefluss-Diagramm ein-/ausblenden, Darstellung (Hell/Dunkel) sowie der
+      <a href="#darstellung">automatische Hell/Dunkel-Wechsel</a>.</p>
+    <h3>Firmware</h3>
+    <p>Version, automatische Update-Prüfung ein-/ausschalten, manuelle Prüfung/Installation,
+      sowie der Link zur <strong>Geräte-Status-Seite</strong> (Laufzeit, freier
+      Speicher, Flash- und Dateisystem-Belegung, Chip-Temperatur, WLAN-Signalstärke,
+      MQTT-Verbindungsstatus) — reine Diagnose-Informationen, nichts davon ist
+      einstellbar.</p>
+    <h3>WLAN</h3>
+    <p>Siehe <a href="#wlan-reset">WLAN zurücksetzen</a> oben.</p>
+    <h3>Sicherheit</h3>
+    <p>Siehe <a href="#pin">PIN-Schutz</a> unten.</p>
+    <h3>Einstellungen zurücksetzen</h3>
+    <p>Setzt MQTT-Broker, Ladepunkt-IDs und alle Display-Einstellungen auf die
+      Werkswerte zurück. WLAN-Zugangsdaten und ein gesetzter PIN bleiben dabei
+      <strong>erhalten</strong> — ein Zurücksetzen kann also nie versehentlich den
+      eigenen Zugriff auf Netzwerk oder Weboberfläche kosten.</p>
+    <div class="note">Jede Änderung auf dieser Seite erfordert einen Neustart, um zu
+      wirken — „Speichern &amp; Neustart" erledigt beides in einem Schritt.</div>
+  </section>
+
+  <section class="panel" id="pin">
+    <h2>PIN-Schutz</h2>
+    <p>Ohne PIN ist die Weboberfläche für jeden im selben WLAN ohne Anmeldung
+      erreichbar — für ein privates Heimnetz meist unproblematisch, aber optional
+      absicherbar. Ein gesetzter PIN schützt Einstellungen, Firmware-Updates und den
+      WLAN-Reset-Button in der Weboberfläche per HTTP-Basic-Auth-Abfrage (Benutzername
+      beliebig, Passwort = PIN).</p>
+    <p><strong>PIN vergessen?</strong> Es gibt dafür keinen Reset außer einem erneuten
+      Flashen der Firmware mit aktivierter Option „Erase device" im Installer — das löscht
+      dabei alle gespeicherten Einstellungen, nicht nur den PIN.</p>
+  </section>
+
+  <section class="panel" id="darstellung">
+    <h2>Hell/Dunkel &amp; automatischer Wechsel</h2>
+    <p>Die „Darstellung" (Hell/Dunkel) des Displays lässt sich fest einstellen — oder
+      automatisch nach einem von zwei Zeitplänen wechseln, live und ohne Neustart:</p>
+    <ul class="legend">
+      <li><span class="dot" style="--dot: var(--muted)"></span>
+        <span><strong>Aus</strong> — nur die „Darstellung"-Auswahl entscheidet, wie
+        bisher.</span></li>
+      <li><span class="dot" style="--dot: var(--chargepoint)"></span>
+        <span><strong>Nach Uhrzeit</strong> — zwei feste Uhrzeiten, „Hell ab" und „Dunkel
+        ab" (z.&nbsp;B. 07:00 und 22:00).</span></li>
+      <li><span class="dot" style="--dot: var(--pv)"></span>
+        <span><strong>Sonnenauf-/untergang</strong> — berechnet für jeden Tag neu, auf
+        Basis der ungefähren Mitte Deutschlands. Keine eigene Standort-Eingabe nötig und
+        auch nicht vorgesehen — die Genauigkeit reicht für eine Hell/Dunkel-Entscheidung
+        überall in Deutschland locker aus.</span></li>
+    </ul>
+    <p>Der Wechsel wird alle 30&nbsp;Sekunden geprüft und wirkt sofort auf dem
+      Startbildschirm — ist man gerade in den Einstellungen, wirkt er beim nächsten
+      Verlassen davon.</p>
+  </section>
+
+  <p class="disclaimer">
+    Dies ist kein offizielles Produkt der openWB GmbH &amp; Co. KG. Der Autor arbeitet
+    jedoch eng mit dem openWB-Team zusammen und entwickelt auch darüber hinaus Software
+    für das Projekt.
+  </p>
+</main>
+<div class="lightbox" id="lightbox">
+  <img id="lightbox-img" src="" alt="" />
+</div>
+<script>
+  const lightbox = document.getElementById("lightbox");
+  const lightboxImg = document.getElementById("lightbox-img");
+  document.querySelectorAll(".screenshots img").forEach((img) => {
+    img.addEventListener("click", () => {
+      lightboxImg.src = img.src;
+      lightboxImg.alt = img.alt;
+      lightbox.classList.add("open");
+    });
+  });
+  lightbox.addEventListener("click", () => lightbox.classList.remove("open"));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") lightbox.classList.remove("open");
+  });
+</script>
+</body>
+</html>

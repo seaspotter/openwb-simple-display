@@ -10,6 +10,7 @@
 #include "config/config_store.h"
 #include "fake_state.h"
 #include "ui/screens/screen_boot.h"
+#include "ui/screens/screen_chargepoint.h"
 #include "ui/screens/screen_provisioning.h"
 #include "ui/screens/screen_settings.h"
 #include "ui/screens/screen_status.h"
@@ -109,6 +110,24 @@ int main() {
     Settle();
     WriteBmp((out_dir + "/03_status_single_light.bmp").c_str());
 
+    // The settings-gear icon's popup, one per mode — fake chargepoint 0's mode/fields
+    // are switched just for these captures, then put back before anything else relies
+    // on them (the multi-chargepoint screenshot right after this, in particular).
+    auto capture_popup = [&](const char* mode, const char* filename) {
+        sim::SetFakeChargepointMode(mode);
+        screens::ShowStatusScreen(1);
+        Settle();
+        lv_obj_t* card = screens::DebugGetFirstChargepointCard();
+        if (card != nullptr) screens::DebugOpenSettingsPopup(card);
+        Settle();
+        WriteBmp((out_dir + filename).c_str());
+        lv_obj_clean(lv_layer_top());
+    };
+    capture_popup("instant_charging", "/09_popup_instant_light.bmp");
+    capture_popup("pv_charging", "/10_popup_pv_light.bmp");
+    capture_popup("eco_charging", "/11_popup_eco_light.bmp");
+    sim::SetFakeChargepointMode("pv_charging");
+
     screens::ShowStatusScreen(2);
     Settle();
     WriteBmp((out_dir + "/04_status_multi_light.bmp").c_str());
@@ -132,6 +151,11 @@ int main() {
     screens::ShowStatusScreen(1);
     Settle();
     WriteBmp((out_dir + "/07_status_single_dark.bmp").c_str());
+
+    capture_popup("instant_charging", "/12_popup_instant_dark.bmp");
+    capture_popup("pv_charging", "/13_popup_pv_dark.bmp");
+    capture_popup("eco_charging", "/14_popup_eco_dark.bmp");
+    sim::SetFakeChargepointMode("pv_charging");
 
     screens::ShowStatusScreen(2);
     Settle();

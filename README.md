@@ -1,5 +1,7 @@
 # openwb-simple-display
 
+[![Build and test](https://github.com/seaspotter/openwb-display/actions/workflows/build.yml/badge.svg)](https://github.com/seaspotter/openwb-display/actions/workflows/build.yml)
+
 Ein kleines ESP32-S3-Touchscreen-Display für [openWB](https://openwb.de/)-Ladestationen:
 Ladepunkt-Status auf einen Blick, Touch-/Wisch-Steuerung von Lademodus, Ladestrom und
 Sperrzustand, eine lokale Weboberfläche für Geräteeinstellungen sowie browserbasierte
@@ -9,10 +11,24 @@ Sperrzustand, eine lokale Weboberfläche für Geräteeinstellungen sowie browser
 eng mit dem openWB-Team zusammen und entwickelt auch darüber hinaus Software für das
 Projekt.
 
+<p align="center">
+  <img src="docs/assets/screenshot-light.png" width="200" alt="Ladepunkt-Karte, hell" />
+  <img src="docs/assets/screenshot-dark.png" width="200" alt="Ladepunkt-Karte, dunkel" />
+  <img src="docs/assets/screenshot-popup-instant.png" width="200" alt="Einstellungen-Popup Sofortladen" />
+</p>
+
+📖 **[Projektseite](https://seaspotter.github.io/openwb-display/)** ·
+**[Vollständige Anleitung](https://seaspotter.github.io/openwb-display/anleitung/)**
+
 ## Status
 
-Frühe Entwicklungsphase. Siehe [`docs/`](docs/) (sobald veröffentlicht) für die
-Installationsseite sowie die Meilensteine unten für den aktuellen Fortschritt.
+Funktional vollständig und auf echter Hardware im Dauerbetrieb getestet: Live-Status
+aller konfigurierten Ladepunkte, Touch-Steuerung (Lademodus, Ladestrom, Ladebegrenzung,
+Eco-Preis, Sperren), lokale Weboberfläche, browserbasierte Erstinstallation und Updates
+(mit signierter Firmware und automatischem Rollback), sowie ein automatischer
+Hell/Dunkel-Wechsel nach Uhrzeit oder Sonnenstand. Noch vor dem ersten getaggten
+Release — siehe [`docs/`](docs/) für die Installationsseite (sobald unter GitHub Pages
+veröffentlicht).
 
 ## Hardware
 
@@ -60,6 +76,23 @@ pio run -e sim_interactive && .pio/build/sim_interactive/program [--multi]  # ec
                                                                # benötigt libsdl2-dev
 ```
 
+## Tests
+
+Vier native (hostseitige, ohne Hardware laufende) Testsuiten unter `test/`, alle über
+`pio test -e native_test` ausführbar:
+
+- `test_config_store` — NVS-Konfigurationsspeicher: Laden, Speichern, Zurücksetzen
+- `test_openwb_mqtt` — MQTT-Themen-Parsing (Topic-Suffix → Statusfeld) gegen reale,
+  live vom Broker aufgezeichnete Nutzlasten
+- `test_sun_times` — Sonnenauf-/untergang-Berechnung (Sommer-/Wintersonnenwende,
+  Zeitfenster- und Sonnenstand-Entscheidungslogik)
+- `test_ota_manifest` — Update-Manifest-Parsing und -Validierung
+
+Dazu läuft `pio run -e sim_screenshot` (siehe oben) bei jedem Build mit, als
+Rendering-Vergleich jedes Bildschirms — fängt Layout-Regressionen, ohne reale Hardware
+anzufassen. Alle vier Testsuiten sowie der Firmware-Build für die reale Hardware laufen
+bei jedem Push automatisiert (siehe Build-Status-Badge oben).
+
 ## Projektstruktur
 
 ```
@@ -75,8 +108,9 @@ src/web/      Lokaler Web-Einstellungsserver (ESPAsyncWebServer) — einziger Or
 src/ota/      Firmware-Update-Manager
 src/sim/      Desktop-Screenshot-/Interaktiv-Tools (siehe "Die Oberfläche ansehen" oben)
               — werden nie in die echte Firmware eingebaut
+test/         Native Unit-Tests (siehe "Tests" oben)
 tools/        Font-/Icon-Asset-Erzeugung, Release-Paketierung
-docs/         GitHub-Pages-Seite: Startseite, Web-Installer, Release-Manifeste
+docs/         GitHub-Pages-Seite: Startseite, Anleitung, Web-Installer, Release-Manifeste
 ```
 
 ## Lizenz

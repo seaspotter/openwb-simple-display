@@ -274,4 +274,8 @@ void ShowStatusScreen(uint8_t chargepoint_count) {
     lv_timer_create(RefreshTick, kRefreshIntervalMs, nullptr);
 }
 
+lv_obj_t* DebugGetFirstChargepointCard() {
+    return g_chargepoint_cards.empty() ? nullptr : g_chargepoint_cards[0];
+}
+
 } // namespace screens

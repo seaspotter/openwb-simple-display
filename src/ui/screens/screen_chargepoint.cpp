@@ -379,9 +379,7 @@ void OnPriceStep(lv_event_t* e) {
 
 // Sofortladen's current stepper and the per-mode limit/price editors, relocated here
 // from the card body (they used to show inline, pushing everything else down).
-void OnSettingsTapped(lv_event_t* e) {
-    auto* widgets = static_cast<ChargepointCardWidgets*>(lv_event_get_user_data(e));
-
+void ShowSettingsPopup(ChargepointCardWidgets* widgets) {
     lv_obj_t* mbox = lv_msgbox_create(nullptr);
     // Default msgbox width is comfortably narrower than the screen; wide enough content
     // (the Ladebegrenzung selector's three buttons, the four-button price stepper) was
@@ -433,7 +431,18 @@ void OnSettingsTapped(lv_event_t* e) {
     }
 }
 
+void OnSettingsTapped(lv_event_t* e) {
+    ShowSettingsPopup(static_cast<ChargepointCardWidgets*>(lv_event_get_user_data(e)));
+}
+
 } // namespace
+
+// Screenshot/documentation tool only (see src/sim/screenshot_main.cpp) — opens the
+// settings popup for `card` without needing a simulated touch event.
+void DebugOpenSettingsPopup(lv_obj_t* card) {
+    auto* widgets = WidgetsOf(card);
+    if (widgets != nullptr) ShowSettingsPopup(widgets);
+}
 
 lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     const theme::Palette& colors = theme::Colors(config::Store().Get().dark_mode);

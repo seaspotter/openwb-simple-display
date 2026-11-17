@@ -24,6 +24,7 @@
   <nav class="quicklinks">
     <a href="#installation">Installation</a>
     <a href="#einrichtung">Einrichtung</a>
+    <a href="anleitung/">Anleitung</a>
     <a href="https://github.com/seaspotter/openwb-display" target="_blank" rel="noopener">GitHub</a>
   </nav>
 
@@ -42,9 +43,10 @@
     <h2>Funktionen</h2>
     <ul class="feature-list">
       <li>Live-Status: PV, Netz, Speicher, Verbraucher und jeder Ladepunkt auf einen Blick</li>
-      <li>Touch-Steuerung: Lademodus, Ladestrom, Sperren/Entsperren direkt am Display</li>
+      <li>Touch-Steuerung: Lademodus, Ladestrom, Ladebegrenzung, Eco-Preis, Sperren/Entsperren</li>
       <li>Lokale Weboberfläche für Geräteeinstellungen, erreichbar per Browser im eigenen Netzwerk</li>
       <li>Firmware-Installation und -Updates direkt im Browser, ohne Toolchain</li>
+      <li>Hell/Dunkel wahlweise fest, nach Uhrzeit oder nach Sonnenauf-/untergang — live, ohne Neustart</li>
     </ul>
   </section>
 
@@ -82,20 +84,66 @@
       <li>Weitere Einstellungen (Helligkeit, Firmware-Updates, optionaler PIN-Schutz)
         über die lokale Weboberfläche unter <code>http://openwb-simple-display.local</code>.</li>
     </ol>
+    <p><small>Jedes Symbol, jede Einstellung und jeder Handgriff im Detail: siehe die
+      <a href="anleitung/">vollständige Anleitung</a>.</small></p>
+  </section>
+
+  <section class="panel">
+    <h2>Mehrere Ladepunkte</h2>
+    <p>Bei mehr als einem konfigurierten Ladepunkt kommt ein Energiefluss-Diagramm
+      (PV, Netz, Speicher, Hausverbrauch, …) über einer wischbaren Ladepunkt-Kartenreihe
+      hinzu — jede Karte lässt sich auch einzeln per Wisch erreichen.</p>
+    <div class="screenshots">
+      <figure>
+        <img src="assets/screenshot-multi-light.png" alt="Energiefluss-Diagramm über mehreren Ladepunkten, hell" width="480" height="480" />
+        <figcaption>Hell</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/screenshot-multi-dark.png" alt="Energiefluss-Diagramm über mehreren Ladepunkten, dunkel" width="480" height="480" />
+        <figcaption>Dunkel</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Touch-Einstellungen je Lademodus</h2>
+    <p>Ein Zahnrad an jeder Ladepunkt-Karte öffnet ein Popup mit genau den Feldern, die
+      openWBs eigene simpleAPI zum Schreiben anbietet — Ladestrom und Ladebegrenzung bei
+      Sofortladen, Ladebegrenzung bei PV-Laden, maximaler Strompreis bei Eco-Laden.</p>
+    <div class="screenshots">
+      <figure>
+        <img src="assets/screenshot-popup-instant.png" alt="Einstellungen-Popup für Sofortladen" width="480" height="480" />
+        <figcaption>Sofortladen</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/screenshot-popup-pv.png" alt="Einstellungen-Popup für PV-Laden" width="480" height="480" />
+        <figcaption>PV-Laden</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/screenshot-popup-eco.png" alt="Einstellungen-Popup für Eco-Laden" width="480" height="480" />
+        <figcaption>Eco-Laden</figcaption>
+      </figure>
+    </div>
   </section>
 
   <section class="panel">
     <h2>Einstellungen</h2>
     <p>Helligkeit und Firmware-Updates direkt am Display, alles andere (MQTT-Broker,
-      Bildschirm-Timeout, PIN-Schutz, WLAN-Reset) über die lokale Weboberfläche.</p>
+      Bildschirm-Timeout, PIN-Schutz, automatischer Hell/Dunkel-Wechsel, WLAN-Reset) über
+      die lokale Weboberfläche — mit eigenem, vom Display unabhängigem Hell/Dunkel-Umschalter.
+      Ausführliche Erklärung aller Felder in der <a href="anleitung/">Anleitung</a>.</p>
     <div class="screenshots">
       <figure>
-        <img src="assets/screenshot-settings.png" alt="Einstellungen direkt am Display" width="480" height="480" />
+        <img src="assets/screenshot-display-settings.png" alt="Einstellungen direkt am Display" width="480" height="480" />
         <figcaption>Am Display</figcaption>
       </figure>
       <figure>
-        <img src="assets/screenshot-web-ui.png" alt="Einstellungen in der Weboberfläche im Browser" width="480" height="980" />
-        <figcaption>Im Browser</figcaption>
+        <img src="assets/screenshot-web-ui.png" alt="Einstellungen in der Weboberfläche im Browser, hell" width="1040" height="1630" />
+        <figcaption>Im Browser (hell)</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/screenshot-web-ui-dark.png" alt="Einstellungen in der Weboberfläche im Browser, dunkel" width="1040" height="1630" />
+        <figcaption>Im Browser (dunkel)</figcaption>
       </figure>
     </div>
   </section>
@@ -104,6 +152,19 @@
     <h2>Hardware</h2>
     <div class="status-row"><span>Board</span><span class="value">Guition ESP32-4848S040C</span></div>
     <div class="status-row"><span>Display</span><span class="value">4&Prime; 480&times;480 Touch</span></div>
+  </section>
+
+  <section class="panel">
+    <h2>Qualität</h2>
+    <p>Jeder Commit durchläuft automatisiert: Firmware-Build für die reale Hardware,
+      native Unit-Tests (MQTT-Parsing, Konfigurationsspeicher, Sonnenauf-/untergang-
+      Berechnung, Update-Manifest) sowie ein Rendering-Vergleich jedes Bildschirms gegen
+      bekannte Werte — bevor überhaupt reale Hardware angefasst wird.</p>
+    <a href="https://github.com/seaspotter/openwb-display/actions/workflows/build.yml"
+      target="_blank" rel="noopener">
+      <img src="https://github.com/seaspotter/openwb-display/actions/workflows/build.yml/badge.svg"
+        alt="Build-Status" />
+    </a>
   </section>
 
   <section class="panel">

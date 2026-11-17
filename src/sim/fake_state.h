@@ -50,4 +50,20 @@ inline void SeedFakeState() {
     state::State().SetChargepointStatus(1, cp1);
 }
 
+// Screenshot tool only — switches chargepoint 0's mode (and seeds that mode's popup
+// fields) so the settings popup screenshot for each mode has realistic content.
+inline void SetFakeChargepointMode(const char* chargemode) {
+    openwb::ChargepointStatus cp = state::State().GetChargepointStatus(0);
+    std::strncpy(cp.chargemode, chargemode, sizeof(cp.chargemode) - 1);
+    cp.chargemode[sizeof(cp.chargemode) - 1] = '\0';
+    if (std::strcmp(chargemode, "instant_charging") == 0) {
+        cp.instant_current_a = 16;
+        std::strncpy(cp.instant_limit_type, "soc", sizeof(cp.instant_limit_type) - 1);
+        cp.instant_limit_soc = 80;
+    } else if (std::strcmp(chargemode, "eco_charging") == 0) {
+        cp.max_price_eco_ct = 27.5f;
+    }
+    state::State().SetChargepointStatus(0, cp);
+}
+
 } // namespace sim
