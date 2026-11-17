@@ -10,9 +10,26 @@ namespace widgets {
 namespace {
 
 constexpr const char* kButtonMap[] = {"Sofort", "PV", "Ziel", "Eco", "Stopp", ""};
+// Generous margin above the slowest observed MQTT round-trip through openWB's own
+// control loop (confirmed up to ~5s) — long enough that a real echo always arrives
+// well before this, but short enough that a lost/dropped command doesn't leave the
+// switch stuck showing a selection that never actually took.
+constexpr uint32_t kPendingModeTimeoutMs = 10000;
 
 lv_style_t g_item_default_style; // unselected: plain text, no chrome
 lv_style_t g_item_checked_style; // selected: full pill radius
+
+// screen_status.cpp's RefreshTick calls SetSelectedMode every 500ms from AppState,
+// which still reflects the old mode until openWB's own echo comes back — without this,
+// that periodic refresh stomps the optimistic highlight almost immediately after a tap,
+// and the switch visibly sits on the old mode for the whole round-trip instead of
+// reflecting the user's tap right away.
+struct ModeSwitchUserData {
+    uint8_t chargepoint_id;
+    openwb::ChargeMode pending_mode;
+    bool has_pending;
+    uint32_t pending_set_ms;
+};
 
 openwb::ChargeMode ModeForButtonIndex(uint32_t index) {
     switch (index) {
@@ -40,12 +57,16 @@ void OnValueChanged(lv_event_t* e) {
     uint32_t selected = lv_buttonmatrix_get_selected_button(obj);
     if (selected == LV_BUTTONMATRIX_BUTTON_NONE) return;
 
-    uint8_t chargepoint_id = static_cast<uint8_t>(reinterpret_cast<intptr_t>(lv_obj_get_user_data(obj)));
+    auto* data = static_cast<ModeSwitchUserData*>(lv_obj_get_user_data(obj));
+    openwb::ChargeMode mode = ModeForButtonIndex(selected);
+    data->pending_mode = mode;
+    data->has_pending = true;
+    data->pending_set_ms = lv_tick_get();
 
     net::CommandRequest req{};
     req.type = net::CommandType::kSetChargemode;
-    req.chargepoint_id = chargepoint_id;
-    req.mode = ModeForButtonIndex(selected);
+    req.chargepoint_id = data->chargepoint_id;
+    req.mode = mode;
     net::EnqueueCommand(req);
 }
 
@@ -86,12 +107,22 @@ lv_obj_t* CreateModeSwitch(lv_obj_t* parent, uint8_t chargepoint_id) {
     lv_obj_add_style(matrix, &g_item_checked_style, LV_PART_ITEMS | LV_STATE_CHECKED);
     lv_buttonmatrix_set_map(matrix, kButtonMap);
     lv_buttonmatrix_set_one_checked(matrix, true);
-    lv_obj_set_user_data(matrix, reinterpret_cast<void*>(static_cast<intptr_t>(chargepoint_id)));
+    lv_obj_set_user_data(matrix, new ModeSwitchUserData{chargepoint_id, openwb::ChargeMode::kStop, false, 0});
     lv_obj_add_event_cb(matrix, OnValueChanged, LV_EVENT_VALUE_CHANGED, nullptr);
     return matrix;
 }
 
 void SetSelectedMode(lv_obj_t* mode_switch, openwb::ChargeMode mode) {
+    auto* data = static_cast<ModeSwitchUserData*>(lv_obj_get_user_data(mode_switch));
+    if (data->has_pending) {
+        if (mode == data->pending_mode) {
+            data->has_pending = false; // openWB's echo caught up — reconciled
+        } else if (lv_tick_elaps(data->pending_set_ms) < kPendingModeTimeoutMs) {
+            return; // still waiting for the echo; don't stomp the optimistic highlight
+        } else {
+            data->has_pending = false; // gave up; trust whatever status reports now
+        }
+    }
     lv_buttonmatrix_set_button_ctrl(mode_switch, ButtonIndexForMode(mode), LV_BUTTONMATRIX_CTRL_CHECKED);
 }
 
