@@ -478,10 +478,15 @@ void RefreshChargepointCard(lv_obj_t* card, const openwb::ChargepointStatus& sta
 
     lv_label_set_text(widgets->name_label, status.name[0] != '\0' ? status.name : "Ladepunkt");
 
-    const char* state = status.charging ? "Lädt" : status.plugged ? "Angesteckt, wartet" : "Nicht angesteckt";
+    const char* state = status.locked              ? "Gesperrt"
+                         : status.charging          ? "Lädt"
+                         : status.plugged           ? "Angesteckt, wartet"
+                                                     : "Nicht angesteckt";
     lv_label_set_text(widgets->state_label, state);
     const theme::Palette& colors = theme::Colors(config::Store().Get().dark_mode);
-    if (status.charging) {
+    if (status.locked) {
+        ApplyBadgeStyle(widgets->state_label, colors.error, /*tinted=*/true);
+    } else if (status.charging) {
         ApplyBadgeStyle(widgets->state_label, colors.pv, /*tinted=*/true);
     } else if (status.plugged) {
         ApplyBadgeStyle(widgets->state_label, colors.battery, /*tinted=*/true);
