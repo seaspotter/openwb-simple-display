@@ -30,16 +30,17 @@ struct ChargepointCardWidgets {
     lv_obj_t* soc_label;
 
     lv_obj_t* mode_switch;
-    lv_obj_t* stepper_row; // only shown in Sofort/instant mode
-    lv_obj_t* current_value_label;
+    lv_obj_t* current_value_label; // lives inside the settings popup, created on demand
 
     lv_obj_t* stat_power_label;
     lv_obj_t* stat_phases_label;
     lv_obj_t* stat_current_label;
     lv_obj_t* stat_charged_label;
+    lv_obj_t* stat_range_label;
 
     float current_amps = kCurrentMinAmps;
     bool locked = false;
+    openwb::ChargeMode current_mode = openwb::ChargeMode::kStop;
 };
 
 ChargepointCardWidgets* WidgetsOf(lv_obj_t* card) {
@@ -107,6 +108,58 @@ void OnLockToggle(lv_event_t* e) {
     lv_label_set_text(widgets->lock_icon_label, utf8);
 }
 
+const char* ModeTitle(openwb::ChargeMode mode) {
+    switch (mode) {
+        case openwb::ChargeMode::kInstant: return "Sofortladen";
+        case openwb::ChargeMode::kPv: return "PV-Laden";
+        case openwb::ChargeMode::kTarget: return "Zielladen";
+        case openwb::ChargeMode::kEco: return "Eco-Laden";
+        case openwb::ChargeMode::kStop: return "Gestoppt";
+    }
+    return "Einstellungen";
+}
+
+// Sofortladen's current stepper, relocated here from the card body (it used to show
+// inline, pushing everything else down whenever Sofort was active).
+void OnSettingsTapped(lv_event_t* e) {
+    auto* widgets = static_cast<ChargepointCardWidgets*>(lv_event_get_user_data(e));
+
+    lv_obj_t* mbox = lv_msgbox_create(nullptr);
+    lv_obj_t* title = lv_msgbox_add_title(mbox, ModeTitle(widgets->current_mode));
+    theme::ApplyMsgboxFont(title);
+    lv_msgbox_add_close_button(mbox);
+
+    if (widgets->current_mode != openwb::ChargeMode::kInstant) {
+        lv_obj_t* text = lv_msgbox_add_text(mbox, "Keine Einstellungen für diesen Lademodus verfügbar.");
+        theme::ApplyMsgboxFont(text);
+        return;
+    }
+
+    lv_obj_t* content = lv_msgbox_get_content(mbox);
+    lv_obj_t* stepper_row = lv_obj_create(content);
+    lv_obj_set_style_bg_opa(stepper_row, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(stepper_row, 0, LV_PART_MAIN);
+    lv_obj_set_flex_flow(stepper_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(stepper_row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_size(stepper_row, lv_pct(100), LV_SIZE_CONTENT);
+
+    lv_obj_t* minus_btn = lv_button_create(stepper_row);
+    lv_obj_add_style(minus_btn, theme::FlatButtonStyle(), LV_PART_MAIN);
+    lv_obj_set_user_data(minus_btn, reinterpret_cast<void*>(-1));
+    lv_label_set_text(lv_label_create(minus_btn), "-");
+    lv_obj_add_event_cb(minus_btn, OnCurrentStep, LV_EVENT_CLICKED, widgets);
+
+    widgets->current_value_label = lv_label_create(stepper_row);
+    lv_label_set_text_fmt(widgets->current_value_label, "%.0f A", widgets->current_amps);
+    lv_obj_set_style_pad_hor(widgets->current_value_label, 12, LV_PART_MAIN);
+
+    lv_obj_t* plus_btn = lv_button_create(stepper_row);
+    lv_obj_add_style(plus_btn, theme::FlatButtonStyle(), LV_PART_MAIN);
+    lv_obj_set_user_data(plus_btn, reinterpret_cast<void*>(1));
+    lv_label_set_text(lv_label_create(plus_btn), "+");
+    lv_obj_add_event_cb(plus_btn, OnCurrentStep, LV_EVENT_CLICKED, widgets);
+}
+
 } // namespace
 
 lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
@@ -117,13 +170,14 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     lv_obj_set_size(card, lv_pct(100), lv_pct(100));
     lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_all(card, 16, LV_PART_MAIN);
+    lv_obj_set_style_pad_top(card, 10, LV_PART_MAIN);
     lv_obj_set_style_pad_row(card, 10, LV_PART_MAIN);
 
     auto* widgets = new ChargepointCardWidgets{};
     widgets->chargepoint_id = chargepoint_id;
     lv_obj_set_user_data(card, widgets);
 
-    // Header: name (left); lock + state badge (right).
+    // Header: name (left); lock, settings and state badge (right).
     lv_obj_t* header_row = lv_obj_create(card);
     lv_obj_set_style_bg_opa(header_row, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(header_row, 0, LV_PART_MAIN);
@@ -146,11 +200,20 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     widgets->lock_icon_label =
         widgets::CreateIconLabel(header_right, icon::Glyph::kLockOpen, colors.muted, &font_icons_24);
     lv_obj_add_flag(widgets->lock_icon_label, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_style_pad_all(widgets->lock_icon_label, 6, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(widgets->lock_icon_label, 4, LV_PART_MAIN);
     lv_obj_set_style_radius(widgets->lock_icon_label, LV_RADIUS_CIRCLE, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(widgets->lock_icon_label, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_bg_color(widgets->lock_icon_label, colors.bg, LV_PART_MAIN);
     lv_obj_add_event_cb(widgets->lock_icon_label, OnLockToggle, LV_EVENT_CLICKED, widgets);
+
+    lv_obj_t* settings_icon_label =
+        widgets::CreateIconLabel(header_right, icon::Glyph::kSettings, colors.muted, &font_icons_24);
+    lv_obj_add_flag(settings_icon_label, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_pad_all(settings_icon_label, 4, LV_PART_MAIN);
+    lv_obj_set_style_radius(settings_icon_label, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(settings_icon_label, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(settings_icon_label, colors.bg, LV_PART_MAIN);
+    lv_obj_add_event_cb(settings_icon_label, OnSettingsTapped, LV_EVENT_CLICKED, widgets);
 
     widgets->state_label = lv_label_create(header_right);
     lv_label_set_text(widgets->state_label, "-");
@@ -195,37 +258,11 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
 
     widgets->soc_label = lv_label_create(vehicle_row);
     lv_obj_set_style_text_color(widgets->soc_label, colors.muted, LV_PART_MAIN);
-    lv_label_set_text(widgets->soc_label, "");
+    lv_label_set_text(widgets->soc_label, "SoC: -");
 
     widgets->mode_switch = widgets::CreateModeSwitch(card, chargepoint_id);
 
-    widgets->stepper_row = lv_obj_create(card);
-    lv_obj_t* stepper_row = widgets->stepper_row;
-    lv_obj_add_flag(stepper_row, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_set_style_bg_opa(stepper_row, LV_OPA_TRANSP, LV_PART_MAIN);
-    lv_obj_set_flex_flow(stepper_row, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(stepper_row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_border_width(stepper_row, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(stepper_row, 0, LV_PART_MAIN);
-    lv_obj_set_size(stepper_row, lv_pct(100), LV_SIZE_CONTENT);
-
-    lv_obj_t* minus_btn = lv_button_create(stepper_row);
-    lv_obj_add_style(minus_btn, theme::FlatButtonStyle(), LV_PART_MAIN);
-    lv_obj_set_user_data(minus_btn, reinterpret_cast<void*>(-1));
-    lv_label_set_text(lv_label_create(minus_btn), "-");
-    lv_obj_add_event_cb(minus_btn, OnCurrentStep, LV_EVENT_CLICKED, widgets);
-
-    widgets->current_value_label = lv_label_create(stepper_row);
-    lv_label_set_text_fmt(widgets->current_value_label, "%.0f A", widgets->current_amps);
-    lv_obj_set_style_pad_hor(widgets->current_value_label, 12, LV_PART_MAIN);
-
-    lv_obj_t* plus_btn = lv_button_create(stepper_row);
-    lv_obj_add_style(plus_btn, theme::FlatButtonStyle(), LV_PART_MAIN);
-    lv_obj_set_user_data(plus_btn, reinterpret_cast<void*>(1));
-    lv_label_set_text(lv_label_create(plus_btn), "+");
-    lv_obj_add_event_cb(plus_btn, OnCurrentStep, LV_EVENT_CLICKED, widgets);
-
-    // Stats: Leistung, Strom, Phasen, Geladen.
+    // Stats: Leistung, Phasen, Strom, Geladen, Reichweite.
     lv_obj_t* stats_row = lv_obj_create(card);
     lv_obj_set_style_bg_opa(stats_row, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_style_border_width(stats_row, 0, LV_PART_MAIN);
@@ -240,20 +277,25 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     lv_obj_set_style_text_font(widgets->stat_power_label, &font_sans_14, LV_PART_MAIN);
     lv_label_set_text(widgets->stat_power_label, "0 W");
 
-    lv_obj_t* current_col = CreateStatColumn(stats_row, "Strom");
-    widgets->stat_current_label = lv_label_create(current_col);
-    lv_obj_set_style_text_font(widgets->stat_current_label, &font_sans_14, LV_PART_MAIN);
-    lv_label_set_text(widgets->stat_current_label, "0 A");
-
     lv_obj_t* phases_col = CreateStatColumn(stats_row, "Phasen");
     widgets->stat_phases_label = lv_label_create(phases_col);
     lv_obj_set_style_text_font(widgets->stat_phases_label, &font_sans_14, LV_PART_MAIN);
     lv_label_set_text(widgets->stat_phases_label, "-");
 
+    lv_obj_t* current_col = CreateStatColumn(stats_row, "Strom");
+    widgets->stat_current_label = lv_label_create(current_col);
+    lv_obj_set_style_text_font(widgets->stat_current_label, &font_sans_14, LV_PART_MAIN);
+    lv_label_set_text(widgets->stat_current_label, "0 A");
+
     lv_obj_t* charged_col = CreateStatColumn(stats_row, "Geladen");
     widgets->stat_charged_label = lv_label_create(charged_col);
     lv_obj_set_style_text_font(widgets->stat_charged_label, &font_sans_14, LV_PART_MAIN);
     lv_label_set_text(widgets->stat_charged_label, "0,0 kWh");
+
+    lv_obj_t* range_col = CreateStatColumn(stats_row, "Reichweite");
+    widgets->stat_range_label = lv_label_create(range_col);
+    lv_obj_set_style_text_font(widgets->stat_range_label, &font_sans_14, LV_PART_MAIN);
+    lv_label_set_text(widgets->stat_range_label, "-");
 
     return card;
 }
@@ -287,12 +329,10 @@ void RefreshChargepointCard(lv_obj_t* card, const openwb::ChargepointStatus& sta
     } else {
         lv_label_set_text(widgets->vehicle_name_label, "Kein Fahrzeug bekannt");
     }
-    if (status.soc_percent >= 0 && status.range_km >= 0) {
-        lv_label_set_text_fmt(widgets->soc_label, "%.0f%% · +%.0f km", status.soc_percent, status.range_km);
-    } else if (status.soc_percent >= 0) {
-        lv_label_set_text_fmt(widgets->soc_label, "%.0f%%", status.soc_percent);
+    if (status.soc_percent >= 0) {
+        lv_label_set_text_fmt(widgets->soc_label, "SoC: %.0f%%", status.soc_percent);
     } else {
-        lv_label_set_text(widgets->soc_label, "");
+        lv_label_set_text(widgets->soc_label, "SoC: -");
     }
 
     char power_buf[24];
@@ -305,6 +345,11 @@ void RefreshChargepointCard(lv_obj_t* card, const openwb::ChargepointStatus& sta
     }
     lv_label_set_text_fmt(widgets->stat_current_label, "%.0f A", status.evse_current_a);
     lv_label_set_text_fmt(widgets->stat_charged_label, "%.1f kWh", status.energy_charged_wh / 1000.0f);
+    if (status.range_km >= 0) {
+        lv_label_set_text_fmt(widgets->stat_range_label, "+%.0f km", status.range_km);
+    } else {
+        lv_label_set_text(widgets->stat_range_label, "-");
+    }
 
     openwb::ChargeMode mode = openwb::ChargeMode::kStop;
     bool mode_known = true;
@@ -323,12 +368,8 @@ void RefreshChargepointCard(lv_obj_t* card, const openwb::ChargepointStatus& sta
     }
 
     if (mode_known) {
+        widgets->current_mode = mode;
         widgets::SetSelectedMode(widgets->mode_switch, mode);
-        if (openwb::ChargeModeHasManualCurrent(mode)) {
-            lv_obj_remove_flag(widgets->stepper_row, LV_OBJ_FLAG_HIDDEN);
-        } else {
-            lv_obj_add_flag(widgets->stepper_row, LV_OBJ_FLAG_HIDDEN);
-        }
     }
 }
 
