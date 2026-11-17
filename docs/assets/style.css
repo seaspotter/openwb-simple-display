@@ -309,6 +309,12 @@ code {
     transform: translateY(-1px);
 }
 
+.legend .icon {
+    flex: none;
+    width: 22px;
+    height: 22px;
+}
+
 .legend strong {
     font-weight: 600;
 }
