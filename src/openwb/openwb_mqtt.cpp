@@ -158,6 +158,30 @@ void HandleLogMessage(uint8_t id, const char* payload) {
     state::State().SetChargepointStatus(static_cast<uint8_t>(slot), status);
 }
 
+// Read-only: openWB/chargepoint/<id>/set/charge_template is what simpleAPI_mqtt.py itself
+// writes to when it applies an external chargemode command — reading chargemode.selected
+// from here directly mirrors in milliseconds (confirmed live: ~5ms), instead of waiting
+// for openWB's own control loop to next reconcile and update the simpleAPI GET-mirror
+// topic (confirmed up to 3+ seconds). We never publish to this topic ourselves — doing a
+// read-merge-write against the full blob from this device would risk corrupting
+// unrelated settings (time_charging plans, other modes' parameters, etc.) if anything
+// failed to round-trip exactly.
+void HandleChargeTemplateMessage(uint8_t id, const char* payload) {
+    int slot = SlotForChargepointId(id);
+    if (slot < 0) return;
+
+    JsonDocument doc;
+    if (deserializeJson(doc, payload) != DeserializationError::Ok) return;
+    const char* selected = doc["chargemode"]["selected"] | "";
+    if (selected[0] == '\0') return;
+
+    openwb::ChargepointStatus status = state::State().GetChargepointStatus(static_cast<uint8_t>(slot));
+    strlcpy(status.chargemode, selected, sizeof(status.chargemode));
+    status.valid = true;
+    status.last_update_ms = millis();
+    state::State().SetChargepointStatus(static_cast<uint8_t>(slot), status);
+}
+
 void HandleGlobalMessage(const char* topic, const char* payload) {
     if (HandleHierarchyChildMessage(topic, payload)) return;
     if (HandleExtraCounterPower(topic, payload)) return;
@@ -195,6 +219,7 @@ void OnMessage(char* topic, uint8_t* payload_bytes, unsigned int length) {
     }
     if (ParseIdAfterPrefix(topic, kRawChargepointPrefix, &id, &rest)) {
         if (strcmp(rest, "set/log") == 0) HandleLogMessage(id, payload);
+        else if (strcmp(rest, "set/charge_template") == 0) HandleChargeTemplateMessage(id, payload);
         return;
     }
     HandleGlobalMessage(topic, payload);
@@ -221,6 +246,8 @@ void Subscribe() {
         snprintf(topic, sizeof(topic), "openWB/simpleAPI/chargepoint/%u/#", cfg.chargepoint_ids[i]);
         g_mqtt.subscribe(topic);
         snprintf(topic, sizeof(topic), "openWB/chargepoint/%u/set/log", cfg.chargepoint_ids[i]);
+        g_mqtt.subscribe(topic);
+        snprintf(topic, sizeof(topic), "openWB/chargepoint/%u/set/charge_template", cfg.chargepoint_ids[i]);
         g_mqtt.subscribe(topic);
     }
 }
