@@ -680,7 +680,15 @@ void RefreshChargepointCard(lv_obj_t* card, const openwb::ChargepointStatus& sta
     } else {
         lv_label_set_text(widgets->stat_phases_label, "-");
     }
-    lv_label_set_text_fmt(widgets->stat_current_label, "%.0f A", status.evse_current_a);
+    char current_buf[16];
+    snprintf(current_buf, sizeof(current_buf), "%.1f A", status.evse_current_a);
+    for (char* p = current_buf; *p != '\0'; ++p) {
+        if (*p == '.') {
+            *p = ',';
+            break;
+        }
+    }
+    lv_label_set_text(widgets->stat_current_label, current_buf);
     lv_label_set_text_fmt(widgets->stat_charged_label, "%.1f kWh", status.energy_charged_wh / 1000.0f);
     if (status.charging && status.range_km > 0) {
         lv_label_set_text_fmt(widgets->stat_range_label, "+%.0f km", status.range_km);
