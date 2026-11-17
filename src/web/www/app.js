@@ -93,8 +93,17 @@ async function loadStatus() {
   document.getElementById("status-rows").innerHTML = rows.join("") || "Noch keine Daten.";
 }
 
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function rowHtml(label, value, cssClass) {
-  return `<div class="status-row"><span>${label}</span><span class="value ${cssClass}">${value}</span></div>`;
+  return `<div class="status-row"><span>${escapeHtml(label)}</span><span class="value ${cssClass}">${escapeHtml(value)}</span></div>`;
 }
 
 async function loadInfo() {

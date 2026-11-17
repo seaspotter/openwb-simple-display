@@ -93,7 +93,8 @@ void HandleGetConfig(AsyncWebServerRequest* request) {
     doc["mqtt_validate_cert"] = cfg.mqtt_validate_cert;
     doc["chargepoint_count"] = cfg.chargepoint_count;
     JsonArray ids = doc["chargepoint_ids"].to<JsonArray>();
-    for (uint8_t i = 0; i < cfg.chargepoint_count; ++i) ids.add(cfg.chargepoint_ids[i]);
+    for (uint8_t i = 0; i < cfg.chargepoint_count && i < config::AppConfig::kMaxChargepoints; ++i)
+        ids.add(cfg.chargepoint_ids[i]);
     doc["brightness_pct"] = cfg.brightness_pct;
     doc["screen_timeout_s"] = cfg.screen_timeout_s;
     doc["rotation"] = cfg.rotation;
@@ -113,11 +114,16 @@ void HandleGetConfig(AsyncWebServerRequest* request) {
 bool HandlePostConfig(AsyncWebServerRequest* request, JsonVariant& json) {
     if (!CheckAuth(request)) return false;
     JsonObject body = json.as<JsonObject>();
+    if (body.isNull()) {
+        request->send(400, "application/json", "{\"success\":false,\"error\":\"invalid body\"}");
+        return false;
+    }
 
     config::Store().Update([&](config::AppConfig& c) {
         if (body["mqtt_host"].is<const char*>())
             strlcpy(c.mqtt_host, body["mqtt_host"], sizeof(c.mqtt_host));
-        if (body["mqtt_port"].is<int>()) c.mqtt_port = body["mqtt_port"];
+        if (body["mqtt_port"].is<int>())
+            c.mqtt_port = static_cast<uint16_t>(std::clamp<int>(body["mqtt_port"], 1, 65535));
         if (body["mqtt_username"].is<const char*>())
             strlcpy(c.mqtt_username, body["mqtt_username"], sizeof(c.mqtt_username));
         // Empty/absent = leave unchanged; the GET side never echoes the real secret.
@@ -125,7 +131,8 @@ bool HandlePostConfig(AsyncWebServerRequest* request, JsonVariant& json) {
             strlcpy(c.mqtt_password, body["mqtt_password"], sizeof(c.mqtt_password));
         if (body["mqtt_use_tls"].is<bool>()) c.mqtt_use_tls = body["mqtt_use_tls"];
         if (body["mqtt_validate_cert"].is<bool>()) c.mqtt_validate_cert = body["mqtt_validate_cert"];
-        if (body["brightness_pct"].is<int>()) c.brightness_pct = body["brightness_pct"];
+        if (body["brightness_pct"].is<int>())
+            c.brightness_pct = static_cast<uint8_t>(std::clamp<int>(body["brightness_pct"], 0, 100));
         if (body["screen_timeout_s"].is<int>()) c.screen_timeout_s = body["screen_timeout_s"];
         if (body["rotation"].is<int>()) c.rotation = body["rotation"];
         if (body["dark_mode"].is<bool>()) c.dark_mode = body["dark_mode"];
@@ -151,7 +158,7 @@ bool HandlePostConfig(AsyncWebServerRequest* request, JsonVariant& json) {
     });
 
     if (body["brightness_pct"].is<int>()) {
-        board::SetBacklight(static_cast<uint8_t>(static_cast<int>(body["brightness_pct"])));
+        board::SetBacklight(static_cast<uint8_t>(std::clamp<int>(body["brightness_pct"], 0, 100)));
     }
     // Caller sends the response; CheckAuth() already did on failure.
     return true;

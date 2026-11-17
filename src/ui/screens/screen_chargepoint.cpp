@@ -62,6 +62,13 @@ ChargepointCardWidgets* WidgetsOf(lv_obj_t* card) {
     return static_cast<ChargepointCardWidgets*>(lv_obj_get_user_data(card));
 }
 
+// Without this, re-creating the status screen (e.g. on every automatic dark/light
+// transition, once per configured chargepoint) would leak one ChargepointCardWidgets
+// block per card.
+void OnCardDeleted(lv_event_t* e) {
+    delete static_cast<ChargepointCardWidgets*>(lv_event_get_user_data(e));
+}
+
 // Fresh per-popup-open state, same lifetime pattern as LimitEditorState — seeded from
 // the latest known real value every time the popup is opened, rather than a long-lived
 // field on ChargepointCardWidgets that only ever reflected local taps and never the
@@ -458,6 +465,7 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     auto* widgets = new ChargepointCardWidgets{};
     widgets->chargepoint_id = chargepoint_id;
     lv_obj_set_user_data(card, widgets);
+    lv_obj_add_event_cb(card, OnCardDeleted, LV_EVENT_DELETE, widgets);
 
     // Header: name (left); lock, settings and state badge (right).
     lv_obj_t* header_row = lv_obj_create(card);

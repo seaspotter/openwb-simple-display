@@ -136,12 +136,21 @@ void HandleChargepointMessage(uint8_t id, const char* suffix, const char* payloa
     int slot = SlotForChargepointId(id);
     if (slot < 0) return;
 
-    // TEMP DIAGNOSTIC — remove once the name cross-contamination bug is found.
-    if (strcmp(suffix, "config/name") == 0) {
-        Serial.printf("[name-debug] topic-id=%u slot=%d payload=\"%s\"\n", id, slot, payload);
+    openwb::ChargepointStatus status = state::State().GetChargepointStatus(static_cast<uint8_t>(slot));
+
+    // openWB only republishes a topic when its value changes, so when a vehicle unplugs and
+    // a different one plugs in, fields the new vehicle hasn't republished yet (name/SoC/range/
+    // session energy) would otherwise keep showing the previous vehicle's last known values.
+    if (strcmp(suffix, "plug_state") == 0) {
+        bool now_plugged = ParseBool(payload);
+        if (status.plugged && !now_plugged) {
+            status.connected_vehicle_name[0] = '\0';
+            status.soc_percent = -1;
+            status.range_km = -1;
+            status.energy_charged_wh = 0;
+        }
     }
 
-    openwb::ChargepointStatus status = state::State().GetChargepointStatus(static_cast<uint8_t>(slot));
     if (!ParseChargepointField(suffix, payload, status)) return; // unrecognized suffix
     status.id = id;
     status.valid = true;

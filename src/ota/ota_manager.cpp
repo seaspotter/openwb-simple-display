@@ -31,6 +31,7 @@ Manifest g_last_manifest;
 bool g_have_manifest = false;
 int g_install_progress = -1;
 bool g_update_available = false;
+bool g_install_in_progress = false;
 
 void ApplyCaCertBundle(WiFiClientSecure& client) {
     client.setCACertBundle(x509_crt_imported_bundle_bin_start);
@@ -116,6 +117,18 @@ UpdateCheckResult CheckForUpdate(bool auto_triggered) {
 InstallResult StartInstall(bool force) {
     InstallResult result;
 
+    // StartInstall can be reached from the UI task, the web-config server, and an
+    // automatic net_task check; without this guard two concurrent calls could both
+    // reach Update.begin()/write()/end() against the same OTA partition.
+    if (g_install_in_progress) {
+        strlcpy(result.reason, "Installation läuft bereits", sizeof(result.reason));
+        return result;
+    }
+    struct InstallGuard {
+        InstallGuard() { g_install_in_progress = true; }
+        ~InstallGuard() { g_install_in_progress = false; }
+    } install_guard;
+
     if (!g_have_manifest) {
         strlcpy(result.reason, "noch kein Manifest abgerufen; zuerst auf Update prüfen", sizeof(result.reason));
         return result;
@@ -190,7 +203,15 @@ InstallResult StartInstall(bool force) {
         size_t read_bytes = stream->readBytes(buf, chunk);
         if (read_bytes == 0) break;
 
-        Update.write(buf, read_bytes);
+        size_t written = Update.write(buf, read_bytes);
+        if (written != read_bytes) {
+            util::LogError(kTag, "flash write short, aborting install");
+            Update.abort();
+            http.end();
+            strlcpy(result.reason, "Flash-Schreibfehler beim Download", sizeof(result.reason));
+            g_install_progress = -1;
+            return result;
+        }
         mbedtls_sha256_update(&sha_ctx, buf, read_bytes);
         written_total += read_bytes;
 

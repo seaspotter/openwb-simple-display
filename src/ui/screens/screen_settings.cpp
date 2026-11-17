@@ -51,7 +51,15 @@ void OnBrightnessStep(lv_event_t* e) {
 
 void OnBackTapped(lv_event_t* e) {
     lv_obj_t* previous = static_cast<lv_obj_t*>(lv_event_get_user_data(e));
+    lv_obj_t* settings_screen = lv_screen_active();
     lv_screen_load(previous);
+    // Otherwise every Settings visit leaks its whole widget tree (including the
+    // BrightnessState block below, via its own LV_EVENT_DELETE handler).
+    if (settings_screen != nullptr && settings_screen != previous) lv_obj_del(settings_screen);
+}
+
+void OnBrightnessStateDeleted(lv_event_t* e) {
+    delete static_cast<BrightnessState*>(lv_event_get_user_data(e));
 }
 
 void OnResetWifiTapped(lv_event_t* /*e*/) { ui::ShowWifiResetPrompt(); }
@@ -75,8 +83,19 @@ void DoInstall(bool force) {
         theme::ApplyMsgboxFont(confirm_btn);
         lv_obj_t* cancel_btn = lv_msgbox_add_footer_button(mbox, "Abbrechen");
         theme::ApplyMsgboxFont(cancel_btn);
+        // LVGL v9's footer buttons don't auto-dismiss the msgbox on click, so both paths
+        // must close it explicitly or it stays stuck on screen forever.
         lv_obj_add_event_cb(
-            confirm_btn, [](lv_event_t*) { DoInstall(/*force=*/true); }, LV_EVENT_CLICKED, nullptr);
+            confirm_btn,
+            [](lv_event_t* e) {
+                lv_msgbox_close(static_cast<lv_obj_t*>(lv_event_get_user_data(e)));
+                DoInstall(/*force=*/true);
+            },
+            LV_EVENT_CLICKED, mbox);
+        lv_obj_add_event_cb(
+            cancel_btn,
+            [](lv_event_t* e) { lv_msgbox_close(static_cast<lv_obj_t*>(lv_event_get_user_data(e))); },
+            LV_EVENT_CLICKED, mbox);
         return;
     }
 
@@ -145,6 +164,7 @@ void ShowSettingsScreen() {
     lv_obj_t* display_card = CreateCard(screen, "Display Helligkeit", colors);
 
     auto* brightness_state = new BrightnessState{cfg.brightness_pct, nullptr};
+    lv_obj_add_event_cb(screen, OnBrightnessStateDeleted, LV_EVENT_DELETE, brightness_state);
     lv_obj_t* stepper_group = widgets::CreateGroupRow(display_card, LV_FLEX_ALIGN_START, 0);
 
     lv_obj_t* minus_btn = lv_button_create(stepper_group);

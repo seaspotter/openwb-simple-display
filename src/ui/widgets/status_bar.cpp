@@ -21,6 +21,7 @@ struct StatusBarWidgets {
     lv_obj_t* issue_icon;
     lv_obj_t* update_icon;
     lv_obj_t* connection_icon;
+    lv_timer_t* refresh_timer;
 };
 
 void Refresh(StatusBarWidgets* widgets) {
@@ -70,6 +71,15 @@ void RefreshTick(lv_timer_t* timer) {
 }
 
 void OnSettingsTapped(lv_event_t* /*e*/) { screens::ShowSettingsScreen(); }
+
+// Without this, re-creating the status bar (e.g. on every automatic dark/light
+// transition) would leak one StatusBarWidgets block and leave its RefreshTick timer
+// running forever against an orphaned object.
+void OnStatusBarDeleted(lv_event_t* e) {
+    auto* bar_widgets = static_cast<StatusBarWidgets*>(lv_event_get_user_data(e));
+    lv_timer_del(bar_widgets->refresh_timer);
+    delete bar_widgets;
+}
 
 } // namespace
 
@@ -121,7 +131,8 @@ lv_obj_t* CreateStatusBar(lv_obj_t* parent) {
     lv_obj_add_event_cb(settings_icon, OnSettingsTapped, LV_EVENT_CLICKED, nullptr);
 
     Refresh(bar_widgets); // not just on the first timer tick, to avoid a stale placeholder
-    lv_timer_create(RefreshTick, kRefreshIntervalMs, bar_widgets);
+    bar_widgets->refresh_timer = lv_timer_create(RefreshTick, kRefreshIntervalMs, bar_widgets);
+    lv_obj_add_event_cb(bar, OnStatusBarDeleted, LV_EVENT_DELETE, bar_widgets);
 
     return bar;
 }

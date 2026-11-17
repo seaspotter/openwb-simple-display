@@ -26,6 +26,10 @@ constexpr uint8_t kDemandSlots = 6; // chargepoints, battery charge, grid export
                                      // Verbraucher, Hausverbrauch, Zähler
 
 std::vector<lv_obj_t*> g_chargepoint_cards;
+// Re-created every time ShowStatusScreen runs (initial boot transition, plus every
+// automatic dark/light schedule flip); tracked so the previous instance can be stopped
+// instead of leaking a duplicate RefreshTick running forever against an orphaned screen.
+lv_timer_t* g_refresh_timer = nullptr;
 
 // Two bars: where power comes from (PV/grid import), where it's going (chargepoints/
 // battery/grid export/Verbraucher). Each bar is a fixed set of *slots*, not fixed
@@ -229,6 +233,11 @@ void RefreshTick(lv_timer_t* /*timer*/) {
 } // namespace
 
 void ShowStatusScreen(uint8_t chargepoint_count) {
+    // Captured before creating the new screen so it can be freed below instead of
+    // leaking — this runs again on every automatic dark/light schedule flip, not just
+    // once at boot.
+    lv_obj_t* old_screen = lv_screen_active();
+
     lv_obj_t* screen = lv_obj_create(nullptr);
     lv_obj_add_style(screen, theme::ScreenStyle(), LV_PART_MAIN);
     g_chargepoint_cards.clear();
@@ -264,14 +273,21 @@ void ShowStatusScreen(uint8_t chargepoint_count) {
         lv_obj_set_flex_grow(pager, 1);
 
         const config::AppConfig& cfg = config::Store().Get();
-        for (uint8_t i = 0; i < chargepoint_count; ++i) {
+        for (uint8_t i = 0; i < chargepoint_count && i < config::AppConfig::kMaxChargepoints; ++i) {
             lv_obj_t* tile = widgets::CreatePagerTile(pager, i);
             g_chargepoint_cards.push_back(CreateChargepointCard(tile, cfg.chargepoint_ids[i]));
         }
     }
 
     lv_screen_load(screen);
-    lv_timer_create(RefreshTick, kRefreshIntervalMs, nullptr);
+
+    if (g_refresh_timer != nullptr) lv_timer_del(g_refresh_timer);
+    g_refresh_timer = lv_timer_create(RefreshTick, kRefreshIntervalMs, nullptr);
+
+    // Deleted last, after the new screen is active: frees the previous screen's whole
+    // widget tree (status bar, mode switches, chargepoint cards and their heap state via
+    // each widget's own LV_EVENT_DELETE handler) instead of leaking it.
+    if (old_screen != nullptr && old_screen != screen) lv_obj_del(old_screen);
 }
 
 lv_obj_t* DebugGetFirstChargepointCard() {

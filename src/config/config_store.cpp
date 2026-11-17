@@ -36,6 +36,14 @@ void ConfigStore::Load() {
         Migrate(loaded, loaded.schema_version);
     }
 
+    // Defend against a corrupted/partially-written NVS blob that still happens to match
+    // sizeof(AppConfig): clamp chargepoint_count so every consumer's fixed-size
+    // chargepoint_ids[kMaxChargepoints] loop stays in bounds.
+    if (loaded.chargepoint_count > AppConfig::kMaxChargepoints) {
+        util::LogWarn(kTag, "stored chargepoint_count out of range, clamping");
+        loaded.chargepoint_count = AppConfig::kMaxChargepoints;
+    }
+
     cached_ = loaded;
     loaded_ = true;
 }
@@ -73,12 +81,13 @@ void ConfigStore::ResetToDefaults() { Save(DefaultConfig()); }
 void ConfigStore::ResetSettingsPreservingConnection() {
     AppConfig current = Get();
     AppConfig fresh = DefaultConfig();
-    // strcpy, not strlcpy: both sides are fixed-size AppConfig arrays of the same type,
-    // already null-terminated by construction.
-    strcpy(fresh.wifi_ssid, current.wifi_ssid);
-    strcpy(fresh.wifi_password, current.wifi_password);
-    strcpy(fresh.web_ui_pin, current.web_ui_pin);
-    strcpy(fresh.device_name, current.device_name);
+    // strlcpy, not strcpy: `current` may have come from a corrupted/stale NVS blob that
+    // Load() couldn't fully validate (see the chargepoint_count clamp above) and isn't
+    // guaranteed to be null-terminated within its fixed size.
+    strlcpy(fresh.wifi_ssid, current.wifi_ssid, sizeof(fresh.wifi_ssid));
+    strlcpy(fresh.wifi_password, current.wifi_password, sizeof(fresh.wifi_password));
+    strlcpy(fresh.web_ui_pin, current.web_ui_pin, sizeof(fresh.web_ui_pin));
+    strlcpy(fresh.device_name, current.device_name, sizeof(fresh.device_name));
     Save(fresh);
 }
 

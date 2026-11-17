@@ -70,6 +70,12 @@ void OnValueChanged(lv_event_t* e) {
     net::EnqueueCommand(req);
 }
 
+// Without this, re-creating the mode switch (e.g. on every automatic dark/light
+// transition, once per configured chargepoint) would leak one ModeSwitchUserData block.
+void OnMatrixDeleted(lv_event_t* e) {
+    delete static_cast<ModeSwitchUserData*>(lv_event_get_user_data(e));
+}
+
 void EnsureStylesInitialized() {
     static bool initialized = false;
     if (initialized) return;
@@ -111,8 +117,10 @@ lv_obj_t* CreateModeSwitch(lv_obj_t* parent, uint8_t chargepoint_id) {
     lv_obj_add_style(matrix, &g_item_checked_style, LV_PART_ITEMS | LV_STATE_CHECKED);
     lv_buttonmatrix_set_map(matrix, kButtonMap);
     lv_buttonmatrix_set_one_checked(matrix, true);
-    lv_obj_set_user_data(matrix, new ModeSwitchUserData{chargepoint_id, openwb::ChargeMode::kStop, false, 0});
+    auto* data = new ModeSwitchUserData{chargepoint_id, openwb::ChargeMode::kStop, false, 0};
+    lv_obj_set_user_data(matrix, data);
     lv_obj_add_event_cb(matrix, OnValueChanged, LV_EVENT_VALUE_CHANGED, nullptr);
+    lv_obj_add_event_cb(matrix, OnMatrixDeleted, LV_EVENT_DELETE, data);
     return matrix;
 }
 
