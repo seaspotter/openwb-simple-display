@@ -78,4 +78,25 @@ SunTimes CalculateSunTimes(int day_of_year, double lat_deg, double lon_deg, doub
     return result;
 }
 
+bool IsDarkByTimeRange(int current_hour, int current_minute, uint8_t dark_start_hour, uint8_t dark_start_min,
+                       uint8_t light_start_hour, uint8_t light_start_min) {
+    int current = current_hour * 60 + current_minute;
+    int dark_start = dark_start_hour * 60 + dark_start_min;
+    int light_start = light_start_hour * 60 + light_start_min;
+
+    if (dark_start > light_start) {
+        // The usual case: dark runs from evening across midnight into morning.
+        return current >= dark_start || current < light_start;
+    }
+    // Unusual (dark_start before light_start on the same day), but handled consistently.
+    return current >= dark_start && current < light_start;
+}
+
+bool IsDarkBySunriseSunset(int current_hour, int current_minute, int day_of_year, double lat_deg, double lon_deg,
+                            double utc_offset_hours) {
+    SunTimes sun = CalculateSunTimes(day_of_year, lat_deg, lon_deg, utc_offset_hours);
+    double current = current_hour + (current_minute / 60.0);
+    return !(current >= sun.sunrise_hour && current < sun.sunset_hour);
+}
+
 } // namespace util

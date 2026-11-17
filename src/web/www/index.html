@@ -90,6 +90,20 @@
           <option value="false">Hell</option>
           <option value="true">Dunkel</option>
         </select>
+        <label for="dark_mode_schedule">Automatischer Wechsel</label>
+        <select id="dark_mode_schedule">
+          <option value="0">Aus — nur die Darstellung oben</option>
+          <option value="1">Nach Uhrzeit</option>
+          <option value="2">Sonnenauf-/untergang</option>
+        </select>
+        <div id="schedule-time-fields" style="display:none">
+          <label for="schedule_light_start">Hell ab</label>
+          <input id="schedule_light_start" type="time" />
+          <label for="schedule_dark_start">Dunkel ab</label>
+          <input id="schedule_dark_start" type="time" />
+        </div>
+        <p><small>Wechselt live, ohne Neustart. Sonnenauf-/untergang wird für die Mitte
+          Deutschlands berechnet.</small></p>
       </section>
     </div>
   </div>

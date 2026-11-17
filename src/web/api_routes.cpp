@@ -96,6 +96,11 @@ void HandleGetConfig(AsyncWebServerRequest* request) {
     doc["screen_timeout_s"] = cfg.screen_timeout_s;
     doc["rotation"] = cfg.rotation;
     doc["dark_mode"] = cfg.dark_mode;
+    doc["dark_mode_schedule"] = cfg.dark_mode_schedule;
+    doc["schedule_dark_start_hour"] = cfg.schedule_dark_start_hour;
+    doc["schedule_dark_start_min"] = cfg.schedule_dark_start_min;
+    doc["schedule_light_start_hour"] = cfg.schedule_light_start_hour;
+    doc["schedule_light_start_min"] = cfg.schedule_light_start_min;
     doc["show_flow_chart"] = cfg.show_flow_chart;
     doc["ota_auto_check"] = cfg.ota_auto_check;
     doc["ota_manifest_url"] = cfg.ota_manifest_url;
@@ -122,6 +127,15 @@ bool HandlePostConfig(AsyncWebServerRequest* request, JsonVariant& json) {
         if (body["screen_timeout_s"].is<int>()) c.screen_timeout_s = body["screen_timeout_s"];
         if (body["rotation"].is<int>()) c.rotation = body["rotation"];
         if (body["dark_mode"].is<bool>()) c.dark_mode = body["dark_mode"];
+        if (body["dark_mode_schedule"].is<int>()) c.dark_mode_schedule = body["dark_mode_schedule"];
+        if (body["schedule_dark_start_hour"].is<int>())
+            c.schedule_dark_start_hour = body["schedule_dark_start_hour"];
+        if (body["schedule_dark_start_min"].is<int>())
+            c.schedule_dark_start_min = body["schedule_dark_start_min"];
+        if (body["schedule_light_start_hour"].is<int>())
+            c.schedule_light_start_hour = body["schedule_light_start_hour"];
+        if (body["schedule_light_start_min"].is<int>())
+            c.schedule_light_start_min = body["schedule_light_start_min"];
         if (body["show_flow_chart"].is<bool>()) c.show_flow_chart = body["show_flow_chart"];
         if (body["ota_auto_check"].is<bool>()) c.ota_auto_check = body["ota_auto_check"];
         if (body["ota_manifest_url"].is<const char*>())

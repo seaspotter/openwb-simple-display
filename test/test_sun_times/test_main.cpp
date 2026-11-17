@@ -3,6 +3,8 @@
 #include "util/sun_times.h"
 
 using util::CalculateSunTimes;
+using util::IsDarkByTimeRange;
+using util::IsDarkBySunriseSunset;
 using util::SunTimes;
 
 void setUp() {}
@@ -36,10 +38,32 @@ void test_summer_day_is_longer_than_winter_day() {
     TEST_ASSERT_TRUE(summer_len > winter_len);
 }
 
+// dark_start=22:00, light_start=07:00 — the normal wraps-past-midnight case.
+void test_time_range_basic_boundaries() {
+    TEST_ASSERT_FALSE(IsDarkByTimeRange(12, 0, 22, 0, 7, 0));  // midday: light
+    TEST_ASSERT_TRUE(IsDarkByTimeRange(23, 0, 22, 0, 7, 0));   // late evening: dark
+    TEST_ASSERT_TRUE(IsDarkByTimeRange(3, 0, 22, 0, 7, 0));    // middle of the night: dark
+    TEST_ASSERT_TRUE(IsDarkByTimeRange(22, 0, 22, 0, 7, 0));   // exactly dark_start: dark
+    TEST_ASSERT_FALSE(IsDarkByTimeRange(21, 59, 22, 0, 7, 0)); // just before dark_start: light
+    TEST_ASSERT_FALSE(IsDarkByTimeRange(7, 0, 22, 0, 7, 0));   // exactly light_start: light
+    TEST_ASSERT_TRUE(IsDarkByTimeRange(6, 59, 22, 0, 7, 0));   // just before light_start: dark
+}
+
+void test_sunrise_sunset_midday_is_light_and_midnight_is_dark() {
+    constexpr double kLat = 51.1657;
+    constexpr double kLon = 10.4515;
+    TEST_ASSERT_FALSE(IsDarkBySunriseSunset(12, 0, 172, kLat, kLon, 2.0)); // summer noon
+    TEST_ASSERT_TRUE(IsDarkBySunriseSunset(1, 0, 172, kLat, kLon, 2.0));  // summer 1am
+    TEST_ASSERT_FALSE(IsDarkBySunriseSunset(12, 0, 355, kLat, kLon, 1.0)); // winter noon
+    TEST_ASSERT_TRUE(IsDarkBySunriseSunset(1, 0, 355, kLat, kLon, 1.0));  // winter 1am
+}
+
 int main(int /*argc*/, char** /*argv*/) {
     UNITY_BEGIN();
     RUN_TEST(test_summer_solstice_sunrise_and_sunset_are_in_plausible_range);
     RUN_TEST(test_winter_solstice_sunrise_and_sunset_are_in_plausible_range);
     RUN_TEST(test_summer_day_is_longer_than_winter_day);
+    RUN_TEST(test_time_range_basic_boundaries);
+    RUN_TEST(test_sunrise_sunset_midday_is_light_and_midnight_is_dark);
     return UNITY_END();
 }

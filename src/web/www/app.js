@@ -44,7 +44,26 @@ async function loadConfig() {
   document.getElementById("screen_timeout_s").value = cfg.screen_timeout_s;
   document.getElementById("show_flow_chart").value = String(cfg.show_flow_chart);
   document.getElementById("dark_mode").value = String(cfg.dark_mode);
+  document.getElementById("dark_mode_schedule").value = String(cfg.dark_mode_schedule);
+  document.getElementById("schedule_light_start").value = toTimeInput(
+    cfg.schedule_light_start_hour,
+    cfg.schedule_light_start_min
+  );
+  document.getElementById("schedule_dark_start").value = toTimeInput(
+    cfg.schedule_dark_start_hour,
+    cfg.schedule_dark_start_min
+  );
+  updateScheduleFieldsVisibility();
   document.getElementById("pin-status").textContent = cfg.has_web_ui_pin ? "Aktiv" : "Deaktiviert";
+}
+
+function toTimeInput(hour, minute) {
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function updateScheduleFieldsVisibility() {
+  const mode = document.getElementById("dark_mode_schedule").value;
+  document.getElementById("schedule-time-fields").style.display = mode === "1" ? "block" : "none";
 }
 
 async function loadStatus() {
@@ -83,6 +102,11 @@ async function loadInfo() {
   document.getElementById("fw-version").textContent = info.firmware_version;
 }
 
+function parseTimeInput(elementId, hourKey, minKey) {
+  const [hour, minute] = document.getElementById(elementId).value.split(":").map(Number);
+  return { [hourKey]: hour, [minKey]: minute };
+}
+
 function readSettingsForm() {
   const chargepointIds = document
     .getElementById("chargepoint_ids")
@@ -101,6 +125,9 @@ function readSettingsForm() {
     screen_timeout_s: parseInt(document.getElementById("screen_timeout_s").value, 10),
     show_flow_chart: document.getElementById("show_flow_chart").value === "true",
     dark_mode: document.getElementById("dark_mode").value === "true",
+    dark_mode_schedule: parseInt(document.getElementById("dark_mode_schedule").value, 10),
+    ...parseTimeInput("schedule_light_start", "schedule_light_start_hour", "schedule_light_start_min"),
+    ...parseTimeInput("schedule_dark_start", "schedule_dark_start_hour", "schedule_dark_start_min"),
   };
   const password = document.getElementById("mqtt_password").value;
   if (password) body.mqtt_password = password;
@@ -207,6 +234,7 @@ document.getElementById("check-update-btn").addEventListener("click", checkForUp
 document.getElementById("install-update-btn").addEventListener("click", installUpdate);
 document.getElementById("reset-wifi-btn").addEventListener("click", resetWifi);
 document.getElementById("set-pin-btn").addEventListener("click", setWebUiPin);
+document.getElementById("dark_mode_schedule").addEventListener("change", updateScheduleFieldsVisibility);
 
 initWebUiTheme();
 loadConfig();
