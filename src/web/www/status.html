@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>openwb-simple-display Geräte-Status</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<main>
+  <header class="page-header">
+    <h1>Geräte-Status</h1>
+    <label class="theme-toggle">
+      <span>Hell</span>
+      <input type="checkbox" id="webui-theme-toggle" />
+      <span>Dunkel</span>
+    </label>
+  </header>
+
+  <p><a href="index.html">&larr; Zurück zu den Einstellungen</a></p>
+
+  <section class="panel">
+    <h2>Gerät</h2>
+    <div class="status-row"><span>Firmware-Version</span><span class="value" id="fw-version">-</span></div>
+    <div class="status-row"><span>Laufzeit</span><span class="value" id="uptime">-</span></div>
+    <div class="status-row"><span>Chip</span><span class="value" id="chip-model">-</span></div>
+    <div class="status-row"><span>Chip-Temperatur</span><span class="value" id="chip-temp">-</span></div>
+  </section>
+
+  <section class="panel">
+    <h2>Speicher</h2>
+    <div class="status-row"><span>RAM (frei / gesamt)</span><span class="value" id="heap">-</span></div>
+    <div class="status-row" id="psram-row" style="display:none">
+      <span>PSRAM (frei / gesamt)</span><span class="value" id="psram">-</span>
+    </div>
+    <div class="status-row"><span>Flash-Größe</span><span class="value" id="flash-size">-</span></div>
+    <div class="status-row"><span>Dateisystem (belegt / gesamt)</span><span class="value" id="fs-usage">-</span></div>
+  </section>
+
+  <section class="panel">
+    <h2>Netzwerk</h2>
+    <div class="status-row"><span>WLAN</span><span class="value" id="wifi-ssid">-</span></div>
+    <div class="status-row"><span>Signalstärke</span><span class="value" id="wifi-rssi">-</span></div>
+    <div class="status-row"><span>IP-Adresse</span><span class="value" id="ip-address">-</span></div>
+    <div class="status-row"><span>MQTT-Verbindung</span><span class="value" id="mqtt-status">-</span></div>
+  </section>
+</main>
+<script src="status.js"></script>
+</body>
+</html>

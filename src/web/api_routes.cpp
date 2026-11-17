@@ -4,6 +4,8 @@
 
 #include <ArduinoJson.h>
 #include <AsyncJson.h>
+#include <LittleFS.h>
+#include <WiFi.h>
 
 #include "app_config_build.h"
 #include "board/display_driver.h"
@@ -198,7 +200,18 @@ void HandleGetInfo(AsyncWebServerRequest* request) {
     doc["firmware_version"] = FW_VERSION;
     doc["uptime_s"] = millis() / 1000;
     doc["free_heap"] = ESP.getFreeHeap();
+    doc["heap_size"] = ESP.getHeapSize();
+    doc["free_psram"] = ESP.getPsramSize() > 0 ? ESP.getFreePsram() : 0;
+    doc["psram_size"] = ESP.getPsramSize();
     doc["chip_model"] = ESP.getChipModel();
+    doc["chip_temp_c"] = temperatureRead(); // the chip's own die temperature, not ambient
+    doc["flash_size"] = ESP.getFlashChipSize();
+    doc["fs_used_bytes"] = LittleFS.usedBytes();
+    doc["fs_total_bytes"] = LittleFS.totalBytes();
+    doc["wifi_rssi_dbm"] = WiFi.RSSI();
+    doc["wifi_ssid"] = WiFi.SSID();
+    doc["ip_address"] = WiFi.localIP().toString();
+    doc["mqtt_connected"] = state::State().IsMqttConnected();
 
     SendJson(request, doc);
 }

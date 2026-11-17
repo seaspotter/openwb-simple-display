@@ -27,9 +27,18 @@
       <section class="panel">
         <h2>Firmware</h2>
         <div class="status-row"><span>Version</span><span class="value" id="fw-version">-</span></div>
+        <label for="ota_auto_check">Automatische Update-Prüfung</label>
+        <select id="ota_auto_check">
+          <option value="true">Ein (alle 6 Std.)</option>
+          <option value="false">Aus</option>
+        </select>
+        <p><small>Prüft nur im Hintergrund und zeigt ein Symbol am Display, installiert
+          aber nie von selbst — dafür immer "Update installieren" hier oder am Display
+          antippen.</small></p>
         <button class="secondary" id="check-update-btn">Auf Update prüfen</button>
         <button id="install-update-btn" style="display:none">Update installieren</button>
         <div id="ota-status"></div>
+        <p><a href="status.html">Geräte-Status (RAM, Flash, WLAN-Signal, ...) &rarr;</a></p>
       </section>
 
       <section class="panel">

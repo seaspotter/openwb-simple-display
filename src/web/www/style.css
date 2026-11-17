@@ -175,6 +175,11 @@ input, select {
     font-size: 0.875rem;
 }
 
+a {
+    color: var(--accent);
+    font-size: 0.875rem;
+}
+
 button {
     appearance: none;
     border: none;

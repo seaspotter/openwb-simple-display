@@ -35,6 +35,7 @@ async function loadConfig() {
   const cfg = await res.json();
 
   document.getElementById("device-title").textContent = cfg.device_name;
+  document.getElementById("ota_auto_check").value = String(cfg.ota_auto_check);
   document.getElementById("mqtt_host").value = cfg.mqtt_host || "";
   document.getElementById("mqtt_port").value = cfg.mqtt_port || 1883;
   document.getElementById("mqtt_username").value = cfg.mqtt_username || "";
@@ -116,6 +117,7 @@ function readSettingsForm() {
     .slice(0, 4);
 
   const body = {
+    ota_auto_check: document.getElementById("ota_auto_check").value === "true",
     mqtt_host: document.getElementById("mqtt_host").value,
     mqtt_port: parseInt(document.getElementById("mqtt_port").value, 10),
     mqtt_username: document.getElementById("mqtt_username").value,
