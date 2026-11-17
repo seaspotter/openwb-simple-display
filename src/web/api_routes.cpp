@@ -159,6 +159,14 @@ void HandleWifiReset(AsyncWebServerRequest* request) {
     net::ResetAndReprovision();
 }
 
+void HandleResetSettings(AsyncWebServerRequest* request) {
+    if (!CheckAuth(request)) return;
+    config::Store().ResetSettingsPreservingConnection();
+    // Doesn't restart itself — the frontend follows up with /api/restart, same as a
+    // normal save, so this behaves identically to "reset the form, then save & restart".
+    request->send(200, "application/json", "{\"success\":true}");
+}
+
 void HandleRestart(AsyncWebServerRequest* request) {
     if (!CheckAuth(request)) return;
     // Must respond before restarting — unlike /api/wifi/reset, this keeps WiFi/MQTT
@@ -225,6 +233,7 @@ void RegisterApiRoutes(AsyncWebServer& server) {
     server.on("/api/ota/start", HTTP_POST, HandleOtaStart);
     server.on("/api/ota/progress", HTTP_GET, HandleOtaProgress);
     server.on("/api/wifi/reset", HTTP_POST, HandleWifiReset);
+    server.on("/api/config/reset", HTTP_POST, HandleResetSettings);
     server.on("/api/restart", HTTP_POST, HandleRestart);
 
     auto* config_post_handler = new AsyncCallbackJsonWebHandler(

@@ -1,3 +1,5 @@
+#include <cstring>
+
 #include <unity.h>
 
 #include "config/config_store.h"
@@ -39,11 +41,34 @@ void test_reset_to_defaults_discards_changes() {
     TEST_ASSERT_EQUAL_UINT8(AppConfig{}.brightness_pct, store.Get().brightness_pct);
 }
 
+void test_reset_preserving_connection_keeps_wifi_pin_and_device_name() {
+    ConfigStore store;
+    store.Update([](AppConfig& c) {
+        strcpy(c.wifi_ssid, "MyWifi");
+        strcpy(c.wifi_password, "secret123");
+        strcpy(c.web_ui_pin, "1234");
+        strcpy(c.device_name, "my-display");
+        c.brightness_pct = 5;
+        c.mqtt_port = 8883;
+    });
+
+    store.ResetSettingsPreservingConnection();
+
+    const AppConfig& cfg = store.Get();
+    TEST_ASSERT_EQUAL_STRING("MyWifi", cfg.wifi_ssid);
+    TEST_ASSERT_EQUAL_STRING("secret123", cfg.wifi_password);
+    TEST_ASSERT_EQUAL_STRING("1234", cfg.web_ui_pin);
+    TEST_ASSERT_EQUAL_STRING("my-display", cfg.device_name);
+    TEST_ASSERT_EQUAL_UINT8(AppConfig{}.brightness_pct, cfg.brightness_pct);
+    TEST_ASSERT_EQUAL_UINT16(AppConfig{}.mqtt_port, cfg.mqtt_port);
+}
+
 int main(int /*argc*/, char** /*argv*/) {
     UNITY_BEGIN();
     RUN_TEST(test_get_returns_defaults_on_first_call);
     RUN_TEST(test_save_then_get_reflects_the_change);
     RUN_TEST(test_update_applies_mutator_and_persists);
     RUN_TEST(test_reset_to_defaults_discards_changes);
+    RUN_TEST(test_reset_preserving_connection_keeps_wifi_pin_and_device_name);
     return UNITY_END();
 }

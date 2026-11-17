@@ -9,7 +9,13 @@
 namespace config {
 
 // Bump on any field add/remove/retype; config_store.cpp::Migrate() handles the rest.
-inline constexpr uint8_t kCurrentSchemaVersion = 3; // v3: dropped extra_meter_id, added show_flow_chart
+inline constexpr uint8_t kCurrentSchemaVersion = 4; // v4: added dark_mode auto-schedule fields
+
+enum class DarkModeSchedule : uint8_t {
+    kManual = 0,       // "Darstellung" dropdown is the only thing that sets dark_mode
+    kTimeRange = 1,    // schedule_dark_start_* / schedule_light_start_*
+    kSunriseSunset = 2, // calculated daily (see util/sun_times.h); fixed middle-of-Germany location
+};
 
 struct AppConfig {
     uint8_t schema_version = kCurrentSchemaVersion;
@@ -37,6 +43,15 @@ struct AppConfig {
     uint16_t rotation = 0;           // degrees: 0/90/180/270
     bool dark_mode = false;
     bool show_flow_chart = true; // the PV/grid/battery/... flow bars above the chargepoint pager
+
+    // Automatically flips dark_mode on a schedule, live, no reboot needed — see
+    // util/sun_times.h and ui/lvgl_port.cpp's periodic check. Manual (0) leaves dark_mode
+    // solely under the "Darstellung" dropdown above.
+    uint8_t dark_mode_schedule = static_cast<uint8_t>(DarkModeSchedule::kManual);
+    uint8_t schedule_dark_start_hour = 22;
+    uint8_t schedule_dark_start_min = 0;
+    uint8_t schedule_light_start_hour = 7;
+    uint8_t schedule_light_start_min = 0;
 
     bool ota_auto_check = true; // background checks only notify, never auto-install
     char ota_manifest_url[128] = DEFAULT_OTA_MANIFEST_URL;

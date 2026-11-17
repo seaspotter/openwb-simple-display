@@ -1,5 +1,7 @@
 #include "config_store.h"
 
+#include <cstring>
+
 #include "config_defaults.h"
 #include "util/logging.h"
 
@@ -67,6 +69,18 @@ void ConfigStore::Save(const AppConfig& new_config) {
 }
 
 void ConfigStore::ResetToDefaults() { Save(DefaultConfig()); }
+
+void ConfigStore::ResetSettingsPreservingConnection() {
+    AppConfig current = Get();
+    AppConfig fresh = DefaultConfig();
+    // strcpy, not strlcpy: both sides are fixed-size AppConfig arrays of the same type,
+    // already null-terminated by construction.
+    strcpy(fresh.wifi_ssid, current.wifi_ssid);
+    strcpy(fresh.wifi_password, current.wifi_password);
+    strcpy(fresh.web_ui_pin, current.web_ui_pin);
+    strcpy(fresh.device_name, current.device_name);
+    Save(fresh);
+}
 
 ConfigStore& Store() {
     static ConfigStore instance;

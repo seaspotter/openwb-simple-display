@@ -24,6 +24,12 @@ public:
 
     void ResetToDefaults();
 
+    // Like ResetToDefaults(), but keeps WiFi credentials, the web UI PIN, and the
+    // device name — what the web UI's "Einstellungen zurücksetzen" button calls, so it
+    // can't lock the person out of the device or this page while resetting everything
+    // else (MQTT broker, chargepoint IDs, display settings) back to defaults.
+    void ResetSettingsPreservingConnection();
+
 private:
     void Load();
     void Migrate(AppConfig& config, uint8_t from_version);

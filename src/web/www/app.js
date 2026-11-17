@@ -173,6 +173,24 @@ async function setWebUiPin() {
   loadConfig();
 }
 
+async function resetSettingsToDefaults() {
+  if (!confirm("MQTT-Broker-, Ladepunkt- und Display-Einstellungen wirklich auf die Standardwerte " +
+      "zurücksetzen? WLAN-Zugangsdaten und PIN bleiben erhalten. Das Display startet danach neu.")) {
+    return;
+  }
+  const res = await postJson("/api/config/reset", {});
+  if (!res.ok) {
+    showToast("Zurücksetzen fehlgeschlagen.");
+    return;
+  }
+  showToast("Zurückgesetzt — Neustart...");
+  try {
+    await fetch("/api/restart", { method: "POST" });
+  } catch (e) {
+    // Expected: the device reboots right after responding.
+  }
+}
+
 async function resetWifi() {
   if (!confirm("WLAN wirklich zurücksetzen? Das Display startet danach im Einrichtungsmodus neu.")) return;
   try {
@@ -184,6 +202,7 @@ async function resetWifi() {
 }
 
 document.getElementById("save-restart-btn").addEventListener("click", saveAndRestart);
+document.getElementById("reset-defaults-btn").addEventListener("click", resetSettingsToDefaults);
 document.getElementById("check-update-btn").addEventListener("click", checkForUpdate);
 document.getElementById("install-update-btn").addEventListener("click", installUpdate);
 document.getElementById("reset-wifi-btn").addEventListener("click", resetWifi);
