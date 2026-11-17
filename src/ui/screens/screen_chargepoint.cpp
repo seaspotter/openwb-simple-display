@@ -30,8 +30,10 @@ struct ChargepointCardWidgets {
     lv_obj_t* soc_label;
 
     lv_obj_t* mode_switch;
-    lv_obj_t* limit_indicator_label; // shows the active Ladebegrenzung, if any, for
-                                      // whichever of Sofort/PV is currently selected
+    // Icon + value for the active Ladebegrenzung on whichever of Sofort/PV is selected;
+    // the row is hidden entirely when there's no limit.
+    lv_obj_t* limit_indicator_row;
+    lv_obj_t* limit_indicator_label;
     lv_obj_t* current_value_label;   // lives inside the settings popup, created on demand
 
     lv_obj_t* stat_power_label;
@@ -493,11 +495,13 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
 
     widgets->mode_switch = widgets::CreateModeSwitch(card, chargepoint_id);
 
-    widgets->limit_indicator_label = lv_label_create(card);
+    widgets->limit_indicator_row = widgets::CreateGroupRow(card, LV_FLEX_ALIGN_START);
+    widgets::CreateIconLabel(widgets->limit_indicator_row, icon::Glyph::kGauge, colors.muted);
+    widgets->limit_indicator_label = lv_label_create(widgets->limit_indicator_row);
     lv_obj_set_style_text_font(widgets->limit_indicator_label, &font_sans_11, LV_PART_MAIN);
     lv_obj_set_style_text_color(widgets->limit_indicator_label, colors.muted, LV_PART_MAIN);
     lv_label_set_text(widgets->limit_indicator_label, "");
-    lv_obj_add_flag(widgets->limit_indicator_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(widgets->limit_indicator_row, LV_OBJ_FLAG_HIDDEN);
 
     // Stats: Leistung, Phasen, Strom, Geladen, Reichweite.
     lv_obj_t* stats_row = lv_obj_create(card);
@@ -628,15 +632,15 @@ void RefreshChargepointCard(lv_obj_t* card, const openwb::ChargepointStatus& sta
                                                                      : "none";
     if (mode_known && strcmp(limit_type, "soc") == 0) {
         float soc = mode == openwb::ChargeMode::kInstant ? status.instant_limit_soc : status.pv_limit_soc;
-        lv_label_set_text_fmt(widgets->limit_indicator_label, "Begrenzung: %.0f %% SoC", soc);
-        lv_obj_remove_flag(widgets->limit_indicator_label, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text_fmt(widgets->limit_indicator_label, "bis %.0f %% SoC", soc);
+        lv_obj_remove_flag(widgets->limit_indicator_row, LV_OBJ_FLAG_HIDDEN);
     } else if (mode_known && strcmp(limit_type, "amount") == 0) {
         float amount =
             mode == openwb::ChargeMode::kInstant ? status.instant_limit_amount_kwh : status.pv_limit_amount_kwh;
-        lv_label_set_text_fmt(widgets->limit_indicator_label, "Begrenzung: %.0f kWh", amount);
-        lv_obj_remove_flag(widgets->limit_indicator_label, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text_fmt(widgets->limit_indicator_label, "bis %.0f kWh", amount);
+        lv_obj_remove_flag(widgets->limit_indicator_row, LV_OBJ_FLAG_HIDDEN);
     } else {
-        lv_obj_add_flag(widgets->limit_indicator_label, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(widgets->limit_indicator_row, LV_OBJ_FLAG_HIDDEN);
     }
 }
 
