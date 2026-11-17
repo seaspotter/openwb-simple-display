@@ -38,6 +38,10 @@ lv_obj_t* CreateFlowBar(lv_obj_t* parent, const lv_color_t* colors, uint8_t coun
     lv_obj_set_style_clip_corner(bar, true, LV_PART_MAIN);
     lv_obj_set_size(bar, lv_pct(100), 8);
     lv_obj_remove_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
+    if (count > 0) {
+        lv_obj_set_style_bg_color(bar, colors[count - 1], LV_PART_MAIN);
+        lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_MAIN);
+    }
 
     if (count > kFlowBarMaxSegments) count = kFlowBarMaxSegments;
     for (uint8_t i = 0; i < count; ++i) AddSegment(bar, colors[i]);
@@ -51,6 +55,17 @@ void UpdateFlowBar(lv_obj_t* bar, const float* magnitudes, const lv_color_t* col
 
     float total = 0;
     for (uint8_t i = 0; i < count; ++i) total += std::fabs(magnitudes[i]);
+
+    // Each segment's flex-grow share is rounded to whole pixels independently, which can
+    // leave a sliver of the bar's own (otherwise unpainted, i.e. black) background
+    // uncovered at the right edge. Painting the bar itself in the last segment's color
+    // makes that rounding gap blend in seamlessly instead of showing through.
+    if (count > 0) {
+        lv_obj_set_style_bg_color(bar, colors[count - 1], LV_PART_MAIN);
+        lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_MAIN);
+    } else {
+        lv_obj_set_style_bg_opa(bar, LV_OPA_TRANSP, LV_PART_MAIN);
+    }
 
     for (uint32_t i = 0; i < created_segments; ++i) {
         lv_obj_t* segment = lv_obj_get_child(bar, i);

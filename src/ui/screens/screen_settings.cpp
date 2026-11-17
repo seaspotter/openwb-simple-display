@@ -21,21 +21,32 @@ namespace {
 lv_obj_t* g_ota_status_label = nullptr;
 lv_obj_t* g_install_button = nullptr;
 
-// Live preview only — fires continuously while dragging. Writing to NVS here would
-// block the UI task on a flash write on every pixel of drag, causing visible stutter.
-void OnBrightnessChanged(lv_event_t* e) {
-    lv_obj_t* slider = static_cast<lv_obj_t*>(lv_event_get_target(e));
-    int32_t value = lv_slider_get_value(slider);
-    board::SetBacklight(static_cast<uint8_t>(value));
-}
+constexpr int32_t kBrightnessMinPct = 10;
+constexpr int32_t kBrightnessMaxPct = 100;
+constexpr int32_t kBrightnessStepPct = 5;
 
-// Persists once the drag ends — handed to the net task (see net_task.cpp), not written
-// here directly: the NVS write itself blocks for long enough to glitch the display if
-// done on this task, which shares a core with rendering.
-void OnBrightnessReleased(lv_event_t* e) {
-    lv_obj_t* slider = static_cast<lv_obj_t*>(lv_event_get_target(e));
-    int32_t value = lv_slider_get_value(slider);
-    state::State().SetPendingBrightnessSave(static_cast<uint8_t>(value), lv_tick_get());
+struct BrightnessState {
+    int32_t value_pct;
+    lv_obj_t* value_label;
+};
+
+// +/- instead of a slider: the slider's continuous drag was the thing producing the
+// backlight artifact (reported as "brightness glitch"); discrete steps, same debounced-
+// NVS-save pattern as the chargepoint current stepper, don't trigger it.
+void OnBrightnessStep(lv_event_t* e) {
+    auto* state = static_cast<BrightnessState*>(lv_event_get_user_data(e));
+    lv_obj_t* btn = static_cast<lv_obj_t*>(lv_event_get_target(e));
+    intptr_t direction = reinterpret_cast<intptr_t>(lv_obj_get_user_data(btn));
+
+    state->value_pct += static_cast<int32_t>(direction) * kBrightnessStepPct;
+    if (state->value_pct < kBrightnessMinPct) state->value_pct = kBrightnessMinPct;
+    if (state->value_pct > kBrightnessMaxPct) state->value_pct = kBrightnessMaxPct;
+
+    lv_label_set_text_fmt(state->value_label, "%d %%", static_cast<int>(state->value_pct));
+    board::SetBacklight(static_cast<uint8_t>(state->value_pct));
+    // Debounced, not written here directly: the NVS write itself blocks for long enough
+    // to glitch the display if done on this task, which shares a core with rendering.
+    state::State().SetPendingBrightnessSave(static_cast<uint8_t>(state->value_pct), lv_tick_get());
 }
 
 void OnBackTapped(lv_event_t* e) {
@@ -136,12 +147,30 @@ void ShowSettingsScreen() {
     lv_obj_t* brightness_label = lv_label_create(display_card);
     lv_label_set_text(brightness_label, "Helligkeit");
 
-    lv_obj_t* brightness_slider = lv_slider_create(display_card);
-    lv_obj_set_width(brightness_slider, lv_pct(100));
-    lv_slider_set_range(brightness_slider, 10, 100);
-    lv_slider_set_value(brightness_slider, cfg.brightness_pct, LV_ANIM_OFF);
-    lv_obj_add_event_cb(brightness_slider, OnBrightnessChanged, LV_EVENT_VALUE_CHANGED, nullptr);
-    lv_obj_add_event_cb(brightness_slider, OnBrightnessReleased, LV_EVENT_RELEASED, nullptr);
+    auto* brightness_state = new BrightnessState{cfg.brightness_pct, nullptr};
+    lv_obj_t* brightness_row = lv_obj_create(display_card);
+    lv_obj_set_style_bg_opa(brightness_row, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(brightness_row, 0, LV_PART_MAIN);
+    lv_obj_set_flex_flow(brightness_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(brightness_row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_size(brightness_row, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_remove_flag(brightness_row, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t* minus_btn = lv_button_create(brightness_row);
+    lv_obj_add_style(minus_btn, theme::FlatButtonStyle(), LV_PART_MAIN);
+    lv_obj_set_user_data(minus_btn, reinterpret_cast<void*>(-1));
+    lv_label_set_text(lv_label_create(minus_btn), "-");
+    lv_obj_add_event_cb(minus_btn, OnBrightnessStep, LV_EVENT_CLICKED, brightness_state);
+
+    brightness_state->value_label = lv_label_create(brightness_row);
+    lv_obj_set_style_pad_hor(brightness_state->value_label, 12, LV_PART_MAIN);
+    lv_label_set_text_fmt(brightness_state->value_label, "%d %%", static_cast<int>(cfg.brightness_pct));
+
+    lv_obj_t* plus_btn = lv_button_create(brightness_row);
+    lv_obj_add_style(plus_btn, theme::FlatButtonStyle(), LV_PART_MAIN);
+    lv_obj_set_user_data(plus_btn, reinterpret_cast<void*>(1));
+    lv_label_set_text(lv_label_create(plus_btn), "+");
+    lv_obj_add_event_cb(plus_btn, OnBrightnessStep, LV_EVENT_CLICKED, brightness_state);
 
     // Firmware.
     lv_obj_t* fw_card = CreateCard(screen, "FIRMWARE", colors);
