@@ -10,11 +10,20 @@
 <main>
   <header class="page-header">
     <h1 id="device-title">openwb-simple-display</h1>
-    <label class="theme-toggle">
-      <span>Hell</span>
-      <input type="checkbox" id="webui-theme-toggle" />
-      <span>Dunkel</span>
-    </label>
+    <div class="header-actions">
+      <a href="status.html" class="status-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+        </svg>
+        Geräte-Status
+      </a>
+      <label class="theme-toggle">
+        <span>Hell</span>
+        <input type="checkbox" id="webui-theme-toggle" />
+        <span>Dunkel</span>
+      </label>
+    </div>
   </header>
 
   <div class="columns">
@@ -38,7 +47,6 @@
         <button class="secondary" id="check-update-btn">Auf Update prüfen</button>
         <button id="install-update-btn" style="display:none">Update installieren</button>
         <div id="ota-status"></div>
-        <p><a href="status.html">Geräte-Status (RAM, Flash, WLAN-Signal, ...) &rarr;</a></p>
       </section>
 
       <section class="panel">
