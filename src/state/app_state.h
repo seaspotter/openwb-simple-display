@@ -1,6 +1,7 @@
 // Shared model between the net task (writer) and the UI task (reader).
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 #ifndef UNIT_TEST
@@ -48,6 +49,11 @@ public:
     void SetNetworkReady(bool ready);
     bool IsNetworkReady() const;
 
+    // Shown on the settings screen alongside the mDNS hostname — .local doesn't resolve
+    // on every network/client, so the raw IP is a useful fallback.
+    void SetIpAddress(const char* ip);
+    void GetIpAddress(char* out, size_t out_size) const;
+
     // An NVS commit briefly halts *both* cores, not just the one that issued it — ESP32
     // disables cache access for the other core too while flash is being written, since
     // both cores fetch instructions through the same flash cache. Moving the write to
@@ -72,6 +78,7 @@ private:
     bool mqtt_connected_ = false;
     bool provisioning_active_ = false;
     bool network_ready_ = false;
+    char ip_address_[16] = "";
     bool brightness_save_pending_ = false;
     uint8_t pending_brightness_percent_ = 0;
     uint32_t pending_brightness_set_ms_ = 0;

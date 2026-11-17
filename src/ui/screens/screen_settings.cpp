@@ -204,8 +204,21 @@ void ShowSettingsScreen() {
     lv_label_set_text(lv_label_create(reset_wifi_btn), "WLAN zurücksetzen");
     lv_obj_add_event_cb(reset_wifi_btn, OnResetWifiTapped, LV_EVENT_CLICKED, nullptr);
 
+    lv_obj_t* wifi_spacer = lv_obj_create(wifi_card);
+    lv_obj_set_style_bg_opa(wifi_spacer, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(wifi_spacer, 0, LV_PART_MAIN);
+    lv_obj_set_size(wifi_spacer, 1, 8);
+    lv_obj_remove_flag(wifi_spacer, LV_OBJ_FLAG_SCROLLABLE);
+
+    // .local doesn't resolve on every network/client, so the raw IP is a useful fallback.
+    char ip[16];
+    state::State().GetIpAddress(ip, sizeof(ip));
     lv_obj_t* web_ui_label = lv_label_create(wifi_card);
-    lv_label_set_text_fmt(web_ui_label, "Weitere Einstellungen: http://%s.local", cfg.device_name);
+    if (ip[0] != '\0') {
+        lv_label_set_text_fmt(web_ui_label, "Weitere Einstellungen: http://%s.local (%s)", cfg.device_name, ip);
+    } else {
+        lv_label_set_text_fmt(web_ui_label, "Weitere Einstellungen: http://%s.local", cfg.device_name);
+    }
     lv_obj_set_style_text_color(web_ui_label, colors.muted, LV_PART_MAIN);
     lv_label_set_long_mode(web_ui_label, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(web_ui_label, lv_pct(100));

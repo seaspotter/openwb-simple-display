@@ -1,5 +1,7 @@
 #include "app_state.h"
 
+#include <cstring>
+
 #ifdef UNIT_TEST
 #define LOCK(x) ((void)(x))
 #define UNLOCK(x) ((void)(x))
@@ -89,6 +91,20 @@ bool AppState::IsNetworkReady() const {
     bool copy = network_ready_;
     UNLOCK(&lock_);
     return copy;
+}
+
+void AppState::SetIpAddress(const char* ip) {
+    LOCK(&lock_);
+    strncpy(ip_address_, ip, sizeof(ip_address_) - 1);
+    ip_address_[sizeof(ip_address_) - 1] = '\0';
+    UNLOCK(&lock_);
+}
+
+void AppState::GetIpAddress(char* out, size_t out_size) const {
+    LOCK(&lock_);
+    strncpy(out, ip_address_, out_size - 1);
+    out[out_size - 1] = '\0';
+    UNLOCK(&lock_);
 }
 
 void AppState::SetPendingBrightnessSave(uint8_t percent, uint32_t now_ms) {

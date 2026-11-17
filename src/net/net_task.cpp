@@ -1,6 +1,7 @@
 #include "net_task.h"
 
 #include <Arduino.h>
+#include <WiFi.h>
 
 #include "config/config_store.h"
 #include "ota/ota_gate.h"
@@ -71,6 +72,7 @@ state::CommandResult ExecuteCommand(const CommandRequest& req) {
 
 void NetTask(void* /*param*/) {
     net::Provision(); // blocks until provisioned on first boot
+    state::State().SetIpAddress(WiFi.localIP().toString().c_str());
     state::State().SetNetworkReady(true); // tells the UI task to leave the boot screen
 
     time_sync::Init();
