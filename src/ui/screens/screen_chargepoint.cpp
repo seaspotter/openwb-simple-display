@@ -30,7 +30,9 @@ struct ChargepointCardWidgets {
     lv_obj_t* soc_label;
 
     lv_obj_t* mode_switch;
-    lv_obj_t* current_value_label; // lives inside the settings popup, created on demand
+    lv_obj_t* limit_indicator_label; // shows the active Ladebegrenzung, if any, for
+                                      // whichever of Sofort/PV is currently selected
+    lv_obj_t* current_value_label;   // lives inside the settings popup, created on demand
 
     lv_obj_t* stat_power_label;
     lv_obj_t* stat_phases_label;
@@ -171,6 +173,40 @@ lv_obj_t* CreateStepperRow(lv_obj_t* parent, lv_event_cb_t on_step, void* user_d
     return row;
 }
 
+// Like CreateStepperRow, but with a coarse and a fine step on each side of the value
+// (-coarse, -fine, value, +fine, +coarse) — for a value like a price where a single
+// step size is either too slow to reach or too coarse to land on precisely.
+lv_obj_t* CreateFourButtonStepperRow(lv_obj_t* parent, lv_event_cb_t on_step, void* user_data,
+                                       intptr_t fine_step, intptr_t coarse_step,
+                                       lv_obj_t** out_value_label) {
+    lv_obj_t* row = lv_obj_create(parent);
+    lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(row, 0, LV_PART_MAIN);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(row, 4, LV_PART_MAIN);
+    lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);
+
+    auto add_button = [&](const char* text, intptr_t step) {
+        lv_obj_t* btn = lv_button_create(row);
+        lv_obj_add_style(btn, theme::FlatButtonStyle(), LV_PART_MAIN);
+        lv_obj_set_user_data(btn, reinterpret_cast<void*>(step));
+        lv_label_set_text(lv_label_create(btn), text);
+        lv_obj_add_event_cb(btn, on_step, LV_EVENT_CLICKED, user_data);
+    };
+
+    add_button("--", -coarse_step);
+    add_button("-", -fine_step);
+
+    *out_value_label = lv_label_create(row);
+    lv_obj_set_style_pad_hor(*out_value_label, 8, LV_PART_MAIN);
+
+    add_button("+", fine_step);
+    add_button("++", coarse_step);
+
+    return row;
+}
+
 constexpr const char* kLimitTypeButtonMap[] = {"Keine", "SoC", "Menge", ""};
 
 // Sofortladen/PV-Laden's "Ladebegrenzung" (none/soc/amount) editor — same shape for
@@ -244,13 +280,31 @@ void OnLimitTypeChanged(lv_event_t* e) {
 
 void CreateLimitEditor(lv_obj_t* parent, uint8_t chargepoint_id, bool is_pv, const char* initial_type,
                         float initial_soc, float initial_amount) {
+    const theme::Palette& colors = theme::Colors(config::Store().Get().dark_mode);
     auto* state = new LimitEditorState{chargepoint_id, is_pv,  initial_soc, initial_amount,
                                         nullptr,         nullptr, nullptr,     nullptr};
 
     CreateSettingLabel(parent, "Ladebegrenzung");
 
+    // A plain lv_buttonmatrix inside an lv_msgbox doesn't pick up the theme's own
+    // checked-state coloring the way the main mode switch (a direct screen child) does
+    // — same family of inheritance quirk as lv_msgbox's font (see ApplyMsgboxFont), just
+    // for state styling instead. Setting it explicitly here, rather than relying on
+    // theme defaults, is what actually makes the active option visible.
     lv_obj_t* matrix = lv_buttonmatrix_create(parent);
     lv_obj_set_size(matrix, lv_pct(100), 36);
+    lv_obj_set_style_bg_opa(matrix, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(matrix, colors.bg, LV_PART_MAIN);
+    lv_obj_set_style_radius(matrix, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+    lv_obj_set_style_border_width(matrix, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(matrix, 3, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(matrix, LV_OPA_TRANSP, LV_PART_ITEMS);
+    lv_obj_set_style_border_width(matrix, 0, LV_PART_ITEMS);
+    lv_obj_set_style_shadow_width(matrix, 0, LV_PART_ITEMS);
+    lv_obj_set_style_radius(matrix, LV_RADIUS_CIRCLE, LV_PART_ITEMS);
+    lv_obj_set_style_bg_opa(matrix, LV_OPA_COVER, LV_PART_ITEMS | LV_STATE_CHECKED);
+    lv_obj_set_style_bg_color(matrix, colors.accent, LV_PART_ITEMS | LV_STATE_CHECKED);
+    lv_obj_set_style_text_color(matrix, lv_color_white(), LV_PART_ITEMS | LV_STATE_CHECKED);
     lv_buttonmatrix_set_map(matrix, kLimitTypeButtonMap);
     lv_buttonmatrix_set_one_checked(matrix, true);
     uint32_t initial_index = strcmp(initial_type, "soc") == 0 ? 1 : strcmp(initial_type, "amount") == 0 ? 2 : 0;
@@ -272,12 +326,16 @@ struct PriceEditorState {
     lv_obj_t* value_label;
 };
 
+// Button user_data is the step in *tenths* of a ct (-10/-1/+1/+10 -> -1,0/-0,1/+0,1/+1,0),
+// so one row can offer both a coarse and a fine adjustment — a single 0.5ct step was too
+// coarse to reach most real prices (which commonly carry two decimal places) without a
+// separate fine control.
 void OnPriceStep(lv_event_t* e) {
     auto* state = static_cast<PriceEditorState*>(lv_event_get_user_data(e));
     lv_obj_t* btn = static_cast<lv_obj_t*>(lv_event_get_target(e));
-    intptr_t dir = reinterpret_cast<intptr_t>(lv_obj_get_user_data(btn));
+    intptr_t step_tenths = reinterpret_cast<intptr_t>(lv_obj_get_user_data(btn));
 
-    state->price_ct += static_cast<float>(dir) * 0.5f;
+    state->price_ct += static_cast<float>(step_tenths) * 0.1f;
     if (state->price_ct < 0) state->price_ct = 0;
     lv_label_set_text_fmt(state->value_label, "%.1f ct/kWh", state->price_ct);
 
@@ -319,8 +377,9 @@ void OnSettingsTapped(lv_event_t* e) {
         case openwb::ChargeMode::kEco: {
             auto* price_state = new PriceEditorState{widgets->chargepoint_id, widgets->max_price_eco_ct, nullptr};
             CreateSettingLabel(content, "Max. Preis");
-            lv_obj_t* price_row = CreateStepperRow(content, OnPriceStep, price_state, &price_state->value_label);
-            (void)price_row;
+            // Step in tenths of a ct: fine = 0.1 ct, coarse = 1.0 ct.
+            CreateFourButtonStepperRow(content, OnPriceStep, price_state, /*fine_step=*/1, /*coarse_step=*/10,
+                                        &price_state->value_label);
             lv_label_set_text_fmt(price_state->value_label, "%.1f ct/kWh", price_state->price_ct);
             break;
         }
@@ -433,6 +492,12 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     lv_label_set_text(widgets->soc_label, "SoC: -");
 
     widgets->mode_switch = widgets::CreateModeSwitch(card, chargepoint_id);
+
+    widgets->limit_indicator_label = lv_label_create(card);
+    lv_obj_set_style_text_font(widgets->limit_indicator_label, &font_sans_11, LV_PART_MAIN);
+    lv_obj_set_style_text_color(widgets->limit_indicator_label, colors.muted, LV_PART_MAIN);
+    lv_label_set_text(widgets->limit_indicator_label, "");
+    lv_obj_add_flag(widgets->limit_indicator_label, LV_OBJ_FLAG_HIDDEN);
 
     // Stats: Leistung, Phasen, Strom, Geladen, Reichweite.
     lv_obj_t* stats_row = lv_obj_create(card);
@@ -556,6 +621,22 @@ void RefreshChargepointCard(lv_obj_t* card, const openwb::ChargepointStatus& sta
     if (mode_known) {
         widgets->current_mode = mode;
         widgets::SetSelectedMode(widgets->mode_switch, mode);
+    }
+
+    const char* limit_type = mode == openwb::ChargeMode::kInstant   ? status.instant_limit_type
+                              : mode == openwb::ChargeMode::kPv     ? status.pv_limit_type
+                                                                     : "none";
+    if (mode_known && strcmp(limit_type, "soc") == 0) {
+        float soc = mode == openwb::ChargeMode::kInstant ? status.instant_limit_soc : status.pv_limit_soc;
+        lv_label_set_text_fmt(widgets->limit_indicator_label, "Begrenzung: %.0f %% SoC", soc);
+        lv_obj_remove_flag(widgets->limit_indicator_label, LV_OBJ_FLAG_HIDDEN);
+    } else if (mode_known && strcmp(limit_type, "amount") == 0) {
+        float amount =
+            mode == openwb::ChargeMode::kInstant ? status.instant_limit_amount_kwh : status.pv_limit_amount_kwh;
+        lv_label_set_text_fmt(widgets->limit_indicator_label, "Begrenzung: %.0f kWh", amount);
+        lv_obj_remove_flag(widgets->limit_indicator_label, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(widgets->limit_indicator_label, LV_OBJ_FLAG_HIDDEN);
     }
 }
 

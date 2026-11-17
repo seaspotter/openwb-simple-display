@@ -33,6 +33,8 @@ inline void SeedFakeState() {
     cp0.evse_current_a = 16;
     std::strncpy(cp0.name, "MQTT-Ladepunkt 3", sizeof(cp0.name) - 1);
     cp0.energy_charged_wh = 2400;
+    std::strncpy(cp0.pv_limit_type, "soc", sizeof(cp0.pv_limit_type) - 1);
+    cp0.pv_limit_soc = 80;
     state::State().SetChargepointStatus(0, cp0);
 
     openwb::ChargepointStatus cp1{};
