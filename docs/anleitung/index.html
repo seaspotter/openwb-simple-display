@@ -17,6 +17,7 @@
   </p>
 
   <ul class="toc">
+    <li><a href="#hardware">Hardware</a></li>
     <li><a href="#installation">Installation</a></li>
     <li><a href="#einrichtung">Ersteinrichtung</a></li>
     <li><a href="#statusleiste">Statusleiste</a></li>
@@ -30,6 +31,42 @@
     <li><a href="#pin">PIN-Schutz</a></li>
     <li><a href="#darstellung">Hell/Dunkel &amp; automatischer Wechsel</a></li>
   </ul>
+
+  <section class="panel" id="hardware">
+    <h2>Hardware</h2>
+    <h3>Woher bekomme ich die Hardware?</h3>
+    <p>Unterstützt wird aktuell nur das <strong>Guition/Sunton ESP32-4848S040C</strong> —
+      ein 4″ 480×480 IPS-Touch-Panel mit ST7701S-Displaytreiber und kapazitivem
+      GT911-Touch, erhältlich z.&nbsp;B. über
+      <a href="https://www.aliexpress.com/wholesale?SearchText=ESP32-4848S040C" target="_blank" rel="noopener">AliExpress</a>
+      unter mehreren Händlernamen (Guition, Sunton). Es gibt das Board auch in einer
+      Variante mit eingebauten Relais für Smart-Switch-Anwendungen — für dieses Projekt
+      reicht die <strong>einfache Version ohne Relais</strong> (Modellbezeichnung
+      „ESP32-4848S040C", ohne Relais-Zusatz).</p>
+    <p><small>AliExpress-Angebote ändern sich ständig, daher ein Suchlink statt eines
+      einzelnen Angebots — auf das genaue Modell und Bewertungen des Verkäufers achten.
+      Keine Verbindung oder Empfehlung dieses Projekts zu einem bestimmten Händler.</small></p>
+    <h3>Stromversorgung</h3>
+    <p>Getestet und empfohlen wird ausschließlich <strong>USB-C</strong> — dasselbe Kabel
+      dient auch zum Flashen. Das Board hat laut Community-Berichten weitere
+      Stromanschlüsse (u.&nbsp;a. einen JST-Akku-Anschluss), die hier nicht getestet
+      sind:</p>
+    <div class="note">An den JST-Akku-Anschluss gehört nach übereinstimmenden
+      Community-Berichten <strong>kein 5&nbsp;V</strong> — er ist für eine einzelne
+      Li-Ion/LiPo-Zelle vorgesehen, 5&nbsp;V dort kann das Board beschädigen. Vor der
+      Nutzung eines anderen Anschlusses als USB-C die Dokumentation des jeweiligen
+      Händlers bzw. die <a href="https://community.home-assistant.io/t/guition-4-480x480-esp32-s3-4848s040-smart-display-with-lvgl/729271" target="_blank" rel="noopener">ESPHome/Home-Assistant-Community zu diesem Board</a> prüfen.</div>
+    <h3>Gehäuse &amp; Halterungen</h3>
+    <p>Von der Community entworfene, kostenlose 3D-Druckdateien (nicht Teil dieses
+      Projekts, keine Gewähr für Passgenauigkeit oder Lizenzbedingungen — vor dem Druck
+      selbst prüfen):</p>
+    <ul>
+      <li><a href="https://www.printables.com/model/1881011-guition-4-inch-screen-frame-and-stand-esp32-s3-484" target="_blank" rel="noopener">Screen Frame and Stand</a> — Rahmen mit Standfuß (Printables)</li>
+      <li><a href="https://www.printables.com/model/1654839-guiton-4-480x480-esp32-s3-4848s040-smart-display-c" target="_blank" rel="noopener">Wandmontage mit Platz für einen Akku</a> (Printables)</li>
+      <li><a href="https://www.printables.com/model/1440541-guition-esp32-s3-4848s040-eu-wall-mount/related" target="_blank" rel="noopener">EU-Unterputzdose-Wandhalterung</a> (60&nbsp;mm-Gerätedose, Printables)</li>
+      <li><a href="https://www.printables.com/model/1772350-case-for-guition-4848s040-4-inch-esp32-lcd-module/files" target="_blank" rel="noopener">Gehäuse mit USB-C/PD-Modul-Unterstützung</a> (Printables)</li>
+    </ul>
+  </section>
 
   <section class="panel" id="installation">
     <h2>Installation</h2>
