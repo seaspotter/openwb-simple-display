@@ -1,6 +1,7 @@
 #include "screen_status.h"
 
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
 #include "config/config_store.h"
@@ -12,6 +13,7 @@
 #include "ui/widgets/flow_bar.h"
 #include "ui/widgets/format_power.h"
 #include "ui/widgets/gesture_pager.h"
+#include "ui/pin_prompt.h"
 #include "ui/widgets/status_bar.h"
 #include "ui/wifi_reset_prompt.h"
 
@@ -30,6 +32,16 @@ std::vector<lv_obj_t*> g_chargepoint_cards;
 // automatic dark/light schedule flip); tracked so the previous instance can be stopped
 // instead of leaking a duplicate RefreshTick running forever against an orphaned screen.
 lv_timer_t* g_refresh_timer = nullptr;
+
+// A fresh device defaults to chargepoint_ids={1,0,0,0} (see app_config.h), which almost
+// never matches a real install — the cards just sit empty ("Kein Fahrzeug bekannt")
+// with no indication why. If MQTT is connected but none of the configured IDs have ever
+// produced valid data after a grace period, this shows a one-time hint pointing at the
+// web UI instead of leaving the person to guess. Both reset in ShowStatusScreen so a
+// reboot after fixing the IDs gets a fresh grace period and can hint again if still wrong.
+constexpr uint32_t kNoDataHintGraceMs = 10000;
+uint32_t g_status_screen_shown_at_ms = 0;
+bool g_shown_no_data_hint = false;
 
 // Two bars: where power comes from (PV/grid import), where it's going (chargepoints/
 // battery/grid export/Verbraucher). Each bar is a fixed set of *slots*, not fixed
@@ -109,7 +121,8 @@ lv_obj_t* CreateLegendRow(lv_obj_t* parent) {
     return legend;
 }
 
-void OnLongPressWifiReset(lv_event_t* /*e*/) { ui::ShowWifiResetPrompt(); }
+void OpenWifiResetPrompt(void* /*user_data*/) { ui::ShowWifiResetPrompt(); }
+void OnLongPressWifiReset(lv_event_t* /*e*/) { ui::RequirePin(OpenWifiResetPrompt); }
 
 // Only fires on the panel's own empty area, not its clickable children (mode switch,
 // lock, stepper) — LVGL dispatches to the most specific clickable object under a touch.
@@ -183,12 +196,58 @@ void ApplySortedSlots(FlowItem* items, uint8_t active_count, uint8_t max_slots, 
     widgets::UpdateFlowBar(bar, magnitudes, bar_colors, active_count);
 }
 
+void ShowNoChargepointDataHint() {
+    const config::AppConfig& cfg = config::Store().Get();
+    char ids_buf[32] = "";
+    for (uint8_t i = 0; i < cfg.chargepoint_count && i < config::AppConfig::kMaxChargepoints; ++i) {
+        char one[8];
+        snprintf(one, sizeof(one), "%s%u", i == 0 ? "" : ", ", cfg.chargepoint_ids[i]);
+        strlcat(ids_buf, one, sizeof(ids_buf));
+    }
+
+    lv_obj_t* mbox = lv_msgbox_create(nullptr);
+    lv_obj_set_width(mbox, lv_pct(92));
+    lv_obj_t* title = lv_msgbox_add_title(mbox, "Keine Ladepunkt-Daten");
+    theme::ApplyMsgboxFont(title);
+    lv_msgbox_add_close_button(mbox);
+    lv_obj_t* text = lv_msgbox_add_text(
+        mbox, "openWB ist verbunden, aber für die konfigurierte(n) Ladepunkt-ID(s) "
+              "wurden noch keine Daten empfangen.");
+    theme::ApplyMsgboxFont(text);
+
+    lv_obj_t* content = lv_msgbox_get_content(mbox);
+    char ids_line[64];
+    snprintf(ids_line, sizeof(ids_line), "Konfiguriert: %s", ids_buf[0] != '\0' ? ids_buf : "-");
+    lv_obj_t* ids_label = lv_label_create(content);
+    lv_label_set_text(ids_label, ids_line);
+    theme::ApplyMsgboxFont(ids_label);
+
+    char url_line[80];
+    snprintf(url_line, sizeof(url_line), "Bitte prüfen unter: http://%s.local", cfg.device_name);
+    lv_obj_t* url_label = lv_label_create(content);
+    lv_label_set_text(url_label, url_line);
+    lv_label_set_long_mode(url_label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(url_label, lv_pct(100));
+    theme::ApplyMsgboxFont(url_label);
+}
+
 void RefreshTick(lv_timer_t* /*timer*/) {
     float chargepoints_total_w = 0;
+    bool any_chargepoint_valid = false;
     for (uint8_t i = 0; i < g_chargepoint_cards.size(); ++i) {
         openwb::ChargepointStatus cp = state::State().GetChargepointStatus(i);
         RefreshChargepointCard(g_chargepoint_cards[i], cp);
-        if (cp.valid) chargepoints_total_w += cp.power_w;
+        if (cp.valid) {
+            chargepoints_total_w += cp.power_w;
+            any_chargepoint_valid = true;
+        }
+    }
+
+    if (!g_shown_no_data_hint && !any_chargepoint_valid && !g_chargepoint_cards.empty() &&
+        state::State().IsMqttConnected() &&
+        lv_tick_get() - g_status_screen_shown_at_ms >= kNoDataHintGraceMs) {
+        g_shown_no_data_hint = true;
+        ShowNoChargepointDataHint();
     }
 
     openwb::GlobalStatus global = state::State().GetGlobalStatus();
@@ -238,6 +297,9 @@ void ShowStatusScreen(uint8_t chargepoint_count) {
     // once at boot.
     lv_obj_t* old_screen = lv_screen_active();
 
+    g_status_screen_shown_at_ms = lv_tick_get();
+    g_shown_no_data_hint = false;
+
     lv_obj_t* screen = lv_obj_create(nullptr);
     lv_obj_add_style(screen, theme::ScreenStyle(), LV_PART_MAIN);
     g_chargepoint_cards.clear();
@@ -246,12 +308,15 @@ void ShowStatusScreen(uint8_t chargepoint_count) {
     for (uint8_t i = 0; i < kDemandSlots; ++i) g_demand_icon_labels[i] = g_demand_value_labels[i] = nullptr;
 
     if (chargepoint_count <= 1) {
-        // No pager, no global panel — just the status bar above the card.
+        // No pager (only one card either way) — but the flow panel still shows if
+        // enabled, same as with multiple chargepoints.
         lv_obj_set_flex_flow(screen, LV_FLEX_FLOW_COLUMN);
         lv_obj_set_style_pad_all(screen, 12, LV_PART_MAIN);
         lv_obj_set_style_pad_row(screen, 8, LV_PART_MAIN);
 
         widgets::CreateStatusBar(screen);
+
+        if (config::Store().Get().show_flow_chart) CreateGlobalPanel(screen);
 
         lv_obj_t* card = CreateChargepointCard(screen, /*chargepoint_id=*/
                                                 config::Store().Get().chargepoint_ids[0]);

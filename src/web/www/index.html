@@ -61,10 +61,12 @@
         <h2>Sicherheit</h2>
         <p>Ohne PIN ist diese Weboberfläche für jeden im selben WLAN ohne Anmeldung
           erreichbar. Optional einen PIN setzen, um Einstellungen, Firmware-Updates und
-          WLAN-Reset zu schützen.</p>
+          WLAN-Reset zu schützen. Bei der Anmeldung als Benutzername <code>user</code> und
+          als Passwort den PIN eingeben.</p>
         <div class="status-row"><span>PIN-Schutz</span><span class="value" id="pin-status">-</span></div>
         <label for="web_ui_pin">Neuer PIN (leer lassen und speichern, um ihn zu entfernen)</label>
-        <input id="web_ui_pin" type="password" placeholder="PIN" />
+        <input id="web_ui_pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="16"
+          placeholder="PIN (nur Ziffern)" />
         <button class="secondary" id="set-pin-btn">PIN speichern</button>
         <p><small>PIN vergessen? Es gibt keinen Reset dafür außer einem erneuten Flashen mit
           aktivierter Option "Erase device".</small></p>

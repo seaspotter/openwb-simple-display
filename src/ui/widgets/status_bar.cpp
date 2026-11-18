@@ -6,6 +6,7 @@
 #include "config/config_store.h"
 #include "ota/ota_manager.h"
 #include "state/app_state.h"
+#include "ui/pin_prompt.h"
 #include "ui/screens/screen_settings.h"
 #include "ui/theme/fonts/fonts.h"
 #include "ui/theme/theme_colors.h"
@@ -70,7 +71,8 @@ void RefreshTick(lv_timer_t* timer) {
     Refresh(static_cast<StatusBarWidgets*>(lv_timer_get_user_data(timer)));
 }
 
-void OnSettingsTapped(lv_event_t* /*e*/) { screens::ShowSettingsScreen(); }
+void OpenSettingsScreen(void* /*user_data*/) { screens::ShowSettingsScreen(); }
+void OnSettingsTapped(lv_event_t* /*e*/) { ui::RequirePin(OpenSettingsScreen); }
 
 // Without this, re-creating the status bar (e.g. on every automatic dark/light
 // transition) would leak one StatusBarWidgets block and leave its RefreshTick timer

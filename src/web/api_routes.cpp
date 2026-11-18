@@ -23,8 +23,11 @@ constexpr const char* kMasked = "********";
 bool CheckAuth(AsyncWebServerRequest* request) {
     const config::AppConfig& cfg = config::Store().Get();
     if (cfg.web_ui_pin[0] == '\0') return true;
-    if (request->authenticate("admin", cfg.web_ui_pin)) return true;
-    request->requestAuthentication();
+    if (request->authenticate("user", cfg.web_ui_pin)) return true;
+    // requestAuthentication()'s default is Digest auth, not Basic (despite its name) —
+    // force Basic explicitly, matching what authenticate() checks above and what the
+    // comment on this function always intended.
+    request->requestAuthentication(/*realm=*/nullptr, /*isDigest=*/false);
     return false;
 }
 
