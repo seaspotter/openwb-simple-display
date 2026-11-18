@@ -324,6 +324,13 @@
     <p><small>Jede neue Version wird erst nach einem erfolgreichen ersten Start und einer
       erfolgreichen MQTT-Verbindung als gültig markiert — scheitert beides, springt das
       Display beim nächsten Neustart automatisch auf die vorherige Version zurück.</small></p>
+    <div class="note">Bekanntes Problem: Während des eigentlichen Flash-Schreibvorgangs
+      (nicht während der Prüfung) kann das Display kurzzeitig flackern oder Bildfehler
+      zeigen. Das ist rein optisch, hat keinen Einfluss auf die Installation und endet
+      von selbst, sobald das Display mit der neuen Version neu gestartet ist. Ursache ist
+      eine Einschränkung der verwendeten Display-Bibliothek bei gleichzeitigem
+      Flash-Zugriff; eine Behebung würde einen eigenen, am Gerät selbst geschriebenen
+      Display-Treiber erfordern und ist aktuell nicht geplant.</div>
   </section>
 
   <section class="panel" id="weboberflaeche">
