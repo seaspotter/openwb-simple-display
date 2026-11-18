@@ -179,13 +179,51 @@ async function checkForUpdate() {
     : "none";
 }
 
+// The device hands the actual download+flash off to its own task and responds to
+// /api/ota/start immediately (see ota_manager.cpp) — this polls /api/ota/progress to
+// show real status instead of a static "please wait" message. The poll itself is
+// expected to eventually fail with a network error once the device reboots into the
+// new firmware; that's treated as success, not shown as an error.
+let otaPollTimer = null;
+
+function stopOtaPoll() {
+  if (otaPollTimer !== null) {
+    clearInterval(otaPollTimer);
+    otaPollTimer = null;
+  }
+}
+
+function startOtaPoll() {
+  stopOtaPoll();
+  const el = document.getElementById("ota-status");
+  otaPollTimer = setInterval(async () => {
+    try {
+      const res = await fetch("/api/ota/progress");
+      const progress = await res.json();
+      if (progress.failure_reason) {
+        el.textContent = `Fehlgeschlagen: ${progress.failure_reason}`;
+        stopOtaPoll();
+      } else if (progress.progress_percent >= 0 && progress.progress_percent < 100) {
+        el.textContent = `Installiere… ${progress.progress_percent} %`;
+      } else if (progress.progress_percent >= 100) {
+        el.textContent = "Installation abgeschlossen — Neustart folgt.";
+      }
+    } catch {
+      // The device likely just rebooted into the new firmware mid-request.
+      el.textContent = "Neustart — bitte Seite in Kürze neu laden.";
+      stopOtaPoll();
+    }
+  }, 1000);
+}
+
 async function installUpdate() {
   if (!lastCheckHadUpdate) return;
   const res = await fetch("/api/ota/start", { method: "POST" });
   const result = await res.json();
   const el = document.getElementById("ota-status");
   if (result.started) {
-    el.textContent = "Installation läuft — das Display startet in Kürze neu.";
+    el.textContent = "Installation läuft…";
+    startOtaPoll();
   } else if (result.reason === "charging_active") {
     if (confirm("Ein Ladepunkt lädt gerade. Update trotzdem installieren?")) {
       const forced = await fetch("/api/ota/start", {
@@ -194,9 +232,12 @@ async function installUpdate() {
         body: "force=1",
       });
       const forcedResult = await forced.json();
-      el.textContent = forcedResult.started
-        ? "Installation läuft…"
-        : `Fehlgeschlagen: ${forcedResult.reason}`;
+      if (forcedResult.started) {
+        el.textContent = "Installation läuft…";
+        startOtaPoll();
+      } else {
+        el.textContent = `Fehlgeschlagen: ${forcedResult.reason}`;
+      }
     }
   } else {
     el.textContent = `Installation konnte nicht gestartet werden: ${result.reason}`;

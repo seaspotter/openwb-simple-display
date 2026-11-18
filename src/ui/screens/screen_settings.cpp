@@ -20,6 +20,7 @@ namespace {
 
 lv_obj_t* g_ota_status_label = nullptr;
 lv_obj_t* g_install_button = nullptr;
+lv_timer_t* g_install_poll_timer = nullptr;
 
 constexpr int32_t kBrightnessMinPct = 10;
 constexpr int32_t kBrightnessMaxPct = 100;
@@ -49,6 +50,13 @@ void OnBrightnessStep(lv_event_t* e) {
     state::State().SetPendingBrightnessSave(static_cast<uint8_t>(state->value_pct), lv_tick_get());
 }
 
+void StopInstallPollTimer() {
+    if (g_install_poll_timer != nullptr) {
+        lv_timer_del(g_install_poll_timer);
+        g_install_poll_timer = nullptr;
+    }
+}
+
 void OnBackTapped(lv_event_t* e) {
     lv_obj_t* previous = static_cast<lv_obj_t*>(lv_event_get_user_data(e));
     lv_obj_t* settings_screen = lv_screen_active();
@@ -62,13 +70,37 @@ void OnBrightnessStateDeleted(lv_event_t* e) {
     delete static_cast<BrightnessState*>(lv_event_get_user_data(e));
 }
 
+// Without this, navigating back while an install is still downloading would leave the
+// poll timer below writing into g_ota_status_label/g_install_button after this screen
+// (and those labels) have already been deleted — a use-after-free.
+void OnSettingsScreenDeleted(lv_event_t* /*e*/) { StopInstallPollTimer(); }
+
 void OnResetWifiTapped(lv_event_t* /*e*/) { ui::ShowWifiResetPrompt(); }
+
+// Polls ota::StartInstall()'s now-async result — the actual download+flash runs on its
+// own task (see ota_manager.cpp), not here, so this just reflects its progress.
+void OnInstallPollTick(lv_timer_t* /*timer*/) {
+    const char* failure = ota::InstallFailureReason();
+    if (failure[0] != '\0') {
+        lv_label_set_text_fmt(g_ota_status_label, "Fehlgeschlagen: %s", failure);
+        StopInstallPollTimer();
+        return;
+    }
+    int progress = ota::InstallProgressPercent();
+    if (progress >= 0 && progress < 100) {
+        lv_label_set_text_fmt(g_ota_status_label, "Installiere… %d %%", progress);
+    } else if (progress >= 100) {
+        lv_label_set_text(g_ota_status_label, "Installation abgeschlossen — Neustart folgt.");
+    }
+}
 
 void DoInstall(bool force) {
     ota::InstallResult result = ota::StartInstall(force);
 
     if (result.started) {
-        lv_label_set_text(g_ota_status_label, "Installation läuft — Neustart folgt.");
+        lv_label_set_text(g_ota_status_label, "Installation läuft…");
+        StopInstallPollTimer();
+        g_install_poll_timer = lv_timer_create(OnInstallPollTick, 500, nullptr);
         return;
     }
 
@@ -140,12 +172,17 @@ void OnCheckUpdateTapped(lv_event_t* /*e*/) {
 } // namespace
 
 void ShowSettingsScreen() {
+    // A stale timer from a previous visit (e.g. one that was mid-install when the user
+    // navigated back) must not survive into this fresh screen's widgets.
+    StopInstallPollTimer();
+
     lv_obj_t* previous_screen = lv_screen_active();
     lv_obj_t* screen = lv_obj_create(nullptr);
     lv_obj_add_style(screen, theme::ScreenStyle(), LV_PART_MAIN);
     lv_obj_set_flex_flow(screen, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_all(screen, 12, LV_PART_MAIN);
     lv_obj_set_style_pad_row(screen, 10, LV_PART_MAIN);
+    lv_obj_add_event_cb(screen, OnSettingsScreenDeleted, LV_EVENT_DELETE, nullptr);
 
     const config::AppConfig& cfg = config::Store().Get();
     const theme::Palette& colors = theme::Colors(cfg.dark_mode);

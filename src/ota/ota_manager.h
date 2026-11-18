@@ -20,16 +20,30 @@ UpdateCheckResult CheckForUpdate(bool auto_triggered);
 bool IsUpdateAvailable();
 
 struct InstallResult {
+    // true once the download+flash has been handed off to its own task — NOT that the
+    // install finished. The caller must poll InstallProgressPercent()/
+    // InstallFailureReason() for the outcome, since the real work runs asynchronously
+    // (a full firmware download+flash blocking the calling task — the UI task, or the
+    // web server's request-handling task — for tens of seconds was the actual cause of
+    // a report where an on-device "install" appeared to do nothing: the task either
+    // froze long enough to be mistaken for a hang, or a reset during the still-pending
+    // download left the OTA slot never committed, so the device just kept booting the
+    // old firmware).
     bool started = false;
-    char reason[64] = "";
+    char reason[64] = ""; // only set when started == false (a precondition failed)
 };
 
-// Downloads and flashes the firmware from the manifest last fetched by
-// CheckForUpdate(). force=false refuses while a chargepoint is charging.
+// Validates preconditions synchronously (fast, no network) and, if they pass, hands the
+// actual download+verify+flash+restart off to a dedicated task. force=false refuses
+// while a chargepoint is charging.
 InstallResult StartInstall(bool force);
 
-// 0-100 during an install; -1 if none is running.
+// 0-100 while the async install is running; -1 if none is running.
 int InstallProgressPercent();
+
+// Non-empty if the most recent async install attempt failed (cleared at the start of
+// the next StartInstall() call). Empty while one is still running or none has failed.
+const char* InstallFailureReason();
 
 // Cancels the bootloader's pending rollback once the boot is confirmed healthy.
 // Idempotent. If never called, an unexpected reboot reverts to the previous OTA slot.

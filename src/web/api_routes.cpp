@@ -256,6 +256,7 @@ void HandleOtaProgress(AsyncWebServerRequest* request) {
     if (!CheckAuth(request)) return;
     JsonDocument doc;
     doc["progress_percent"] = ota::InstallProgressPercent();
+    doc["failure_reason"] = ota::InstallFailureReason();
 
     SendJson(request, doc);
 }

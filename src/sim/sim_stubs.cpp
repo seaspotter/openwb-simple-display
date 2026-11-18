@@ -59,4 +59,8 @@ InstallResult StartInstall(bool /*force*/) {
     return result;
 }
 
+int InstallProgressPercent() { return -1; }
+
+const char* InstallFailureReason() { return ""; }
+
 } // namespace ota

@@ -11,11 +11,14 @@
 #include <esp_ota_ops.h>
 #include <mbedtls/sha256.h>
 
+#include <Arduino.h>
+
 #include "app_config_build.h"
 #include "config/config_store.h"
 #include "ota_gate.h"
 #include "ota_manifest.h"
 #include "ota_signing_pubkey.h"
+#include "state/app_state.h"
 #include "third_party/ed25519/ed25519.h"
 #include "util/logging.h"
 
@@ -32,6 +35,7 @@ bool g_have_manifest = false;
 int g_install_progress = -1;
 bool g_update_available = false;
 bool g_install_in_progress = false;
+char g_install_failure_reason[64] = "";
 
 void ApplyCaCertBundle(WiFiClientSecure& client) {
     client.setCACertBundle(x509_crt_imported_bundle_bin_start);
@@ -114,56 +118,48 @@ UpdateCheckResult CheckForUpdate(bool auto_triggered) {
     return result;
 }
 
-InstallResult StartInstall(bool force) {
-    InstallResult result;
+// Runs on its own dedicated task (see StartInstall) — never on the caller's task.
+// Downloading ~1.6MB and writing it to flash takes anywhere from several seconds to
+// over a minute depending on WiFi throughput; running that inline on the calling task
+// (the UI task for an on-device install, the web server's request-handling task for a
+// web-triggered one) blocked rendering/networking for the whole operation and, worse,
+// left a real window where a reset before Update.end() committed the new boot partition
+// would silently leave the device on its old firmware with no error shown — the
+// confirmed cause of a report where neither of two prior releases ever actually landed
+// despite "Installation läuft" being shown.
+void InstallTaskBody(void* param) {
+    bool force = *static_cast<bool*>(param);
+    delete static_cast<bool*>(param);
 
-    // StartInstall can be reached from the UI task, the web-config server, and an
-    // automatic net_task check; without this guard two concurrent calls could both
-    // reach Update.begin()/write()/end() against the same OTA partition.
-    if (g_install_in_progress) {
-        strlcpy(result.reason, "Installation läuft bereits", sizeof(result.reason));
-        return result;
-    }
-    struct InstallGuard {
-        InstallGuard() { g_install_in_progress = true; }
-        ~InstallGuard() { g_install_in_progress = false; }
-    } install_guard;
-
-    if (!g_have_manifest) {
-        strlcpy(result.reason, "noch kein Manifest abgerufen; zuerst auf Update prüfen", sizeof(result.reason));
-        return result;
-    }
-    if (CompareVersions(FW_VERSION, g_last_manifest.min_supported_version) < 0) {
-        strlcpy(result.reason, "Firmware zu alt für dieses Update; bitte manuell per USB neu flashen",
-                sizeof(result.reason));
-        return result;
-    }
-    if (!force && !ShouldAttemptAutomaticInstall()) {
-        strlcpy(result.reason, "charging_active", sizeof(result.reason));
-        return result;
-    }
+    auto fail = [](const char* reason) {
+        strlcpy(g_install_failure_reason, reason, sizeof(g_install_failure_reason));
+        util::LogError(kTag, reason);
+        g_install_progress = -1;
+        g_install_in_progress = false;
+        vTaskDelete(nullptr); // unreachable past this point
+    };
 
     WiFiClientSecure client;
     ApplyCaCertBundle(client);
 
     HTTPClient http;
     if (!http.begin(client, g_last_manifest.firmware_url)) {
-        strlcpy(result.reason, "Firmware-Download konnte nicht gestartet werden", sizeof(result.reason));
-        return result;
+        fail("Firmware-Download konnte nicht gestartet werden");
+        return;
     }
 
     int status = http.GET();
     if (status != HTTP_CODE_OK) {
-        strlcpy(result.reason, "HTTP-Fehler beim Firmware-Download", sizeof(result.reason));
         http.end();
-        return result;
+        fail("HTTP-Fehler beim Firmware-Download");
+        return;
     }
 
     int content_length = http.getSize();
     if (!Update.begin(content_length > 0 ? content_length : UPDATE_SIZE_UNKNOWN)) {
-        strlcpy(result.reason, "nicht genug Platz auf der inaktiven OTA-Partition", sizeof(result.reason));
         http.end();
-        return result;
+        fail("nicht genug Platz auf der inaktiven OTA-Partition");
+        return;
     }
 
     uint8_t expected_sha256[32];
@@ -178,10 +174,9 @@ InstallResult StartInstall(bool force) {
     if (!have_expected_signature) {
         // Refused outright, not just logged — otherwise signing could be bypassed by
         // simply omitting the field.
-        util::LogError(kTag, "manifest has no valid firmware signature, refusing to install");
         http.end();
-        strlcpy(result.reason, "Manifest enthält keine gültige Signatur", sizeof(result.reason));
-        return result;
+        fail("Manifest enthält keine gültige Signatur");
+        return;
     }
 
     mbedtls_sha256_context sha_ctx;
@@ -196,7 +191,7 @@ InstallResult StartInstall(bool force) {
     while (http.connected() && (content_length < 0 || written_total < content_length)) {
         size_t available = stream->available();
         if (available == 0) {
-            delay(1);
+            vTaskDelay(pdMS_TO_TICKS(1));
             continue;
         }
         size_t chunk = std::min(available, sizeof(buf));
@@ -205,12 +200,10 @@ InstallResult StartInstall(bool force) {
 
         size_t written = Update.write(buf, read_bytes);
         if (written != read_bytes) {
-            util::LogError(kTag, "flash write short, aborting install");
             Update.abort();
             http.end();
-            strlcpy(result.reason, "Flash-Schreibfehler beim Download", sizeof(result.reason));
-            g_install_progress = -1;
-            return result;
+            fail("Flash-Schreibfehler beim Download");
+            return;
         }
         mbedtls_sha256_update(&sha_ctx, buf, read_bytes);
         written_total += read_bytes;
@@ -218,6 +211,12 @@ InstallResult StartInstall(bool force) {
         if (content_length > 0) {
             g_install_progress = (written_total * 100) / content_length;
         }
+        // Running on a dedicated task now (not the UI/web-request task), so this isn't
+        // needed to keep the rest of the system responsive — it's here so this task
+        // itself always yields at least once per chunk instead of only when the
+        // network stalls, which is what made a tight run of back-to-back available
+        // chunks able to starve this task's own watchdog feeding.
+        taskYIELD();
     }
     http.end();
 
@@ -228,11 +227,9 @@ InstallResult StartInstall(bool force) {
     // Checked separately from the signature below for a clearer error on plain corruption.
     bool hash_ok = !have_expected_hash || (memcmp(actual_sha256, expected_sha256, 32) == 0);
     if (!hash_ok) {
-        util::LogError(kTag, "downloaded firmware sha256 mismatch, aborting install");
         Update.abort();
-        strlcpy(result.reason, "sha256 stimmt nicht überein", sizeof(result.reason));
-        g_install_progress = -1;
-        return result;
+        fail("sha256 stimmt nicht überein");
+        return;
     }
 
     // Verified against the actual downloaded digest, not the manifest's own claimed
@@ -240,28 +237,77 @@ InstallResult StartInstall(bool force) {
     bool signature_ok =
         ed25519_verify(expected_signature, actual_sha256, sizeof(actual_sha256), kOtaSigningPublicKey) != 0;
     if (!signature_ok) {
-        util::LogError(kTag, "firmware signature verification failed, aborting install");
         Update.abort();
-        strlcpy(result.reason, "Signaturprüfung fehlgeschlagen", sizeof(result.reason));
-        g_install_progress = -1;
-        return result;
+        fail("Signaturprüfung fehlgeschlagen");
+        return;
     }
 
     if (!Update.end(true)) {
-        strlcpy(result.reason, "Flash-Schreibvorgang wurde nicht korrekt abgeschlossen", sizeof(result.reason));
-        g_install_progress = -1;
-        return result;
+        fail("Flash-Schreibvorgang wurde nicht korrekt abgeschlossen");
+        return;
     }
 
     g_install_progress = 100;
-    result.started = true;
     util::LogInfo(kTag, "install verified and flashed, restarting");
     delay(500);
     ESP.restart();
-    return result; // unreachable
+    // unreachable
+}
+
+InstallResult StartInstall(bool force) {
+    InstallResult result;
+
+    // StartInstall can be reached from the UI task, the web-config server, and an
+    // automatic net_task check; without this guard two concurrent calls could both
+    // reach Update.begin()/write()/end() against the same OTA partition.
+    if (g_install_in_progress) {
+        strlcpy(result.reason, "Installation läuft bereits", sizeof(result.reason));
+        return result;
+    }
+
+    if (!g_have_manifest) {
+        strlcpy(result.reason, "noch kein Manifest abgerufen; zuerst auf Update prüfen", sizeof(result.reason));
+        return result;
+    }
+    if (CompareVersions(FW_VERSION, g_last_manifest.min_supported_version) < 0) {
+        strlcpy(result.reason, "Firmware zu alt für dieses Update; bitte manuell per USB neu flashen",
+                sizeof(result.reason));
+        return result;
+    }
+    // Intentionally NOT ShouldAttemptAutomaticInstall() here — that also refuses within
+    // ~5 minutes of any touch, which is exactly what just happened to reach this button
+    // (tapping "Installieren" is itself a touch). That idle check only makes sense for
+    // the automatic background check in net_task.cpp, not for an explicit manual
+    // install — using it here meant a manual install always reported "charging_active"
+    // on the first attempt even with nothing charging, forcing the force-confirm path
+    // every single time.
+    if (!force && state::State().AnyChargepointCharging()) {
+        strlcpy(result.reason, "charging_active", sizeof(result.reason));
+        return result;
+    }
+
+    g_install_failure_reason[0] = '\0';
+    g_install_progress = 0;
+    g_install_in_progress = true;
+
+    auto* force_copy = new bool(force);
+    BaseType_t created = xTaskCreatePinnedToCore(InstallTaskBody, "ota_install", 12288, force_copy,
+                                                  1, nullptr, 0);
+    if (created != pdPASS) {
+        delete force_copy;
+        g_install_in_progress = false;
+        g_install_progress = -1;
+        strlcpy(result.reason, "Installations-Task konnte nicht gestartet werden", sizeof(result.reason));
+        return result;
+    }
+
+    result.started = true;
+    return result;
 }
 
 int InstallProgressPercent() { return g_install_progress; }
+
+const char* InstallFailureReason() { return g_install_failure_reason; }
 
 bool IsUpdateAvailable() { return g_update_available; }
 
