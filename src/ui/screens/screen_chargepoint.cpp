@@ -567,7 +567,7 @@ lv_obj_t* CreateChargepointCard(lv_obj_t* parent, uint8_t chargepoint_id) {
     lv_obj_set_style_text_font(widgets->stat_power_label, &font_sans_14, LV_PART_MAIN);
     lv_label_set_text(widgets->stat_power_label, "0 W");
 
-    lv_obj_t* phases_col = CreateStatColumn(stats_row, "Phasen", 34);
+    lv_obj_t* phases_col = CreateStatColumn(stats_row, "Phasen", 44);
     widgets->stat_phases_label = lv_label_create(phases_col);
     lv_obj_set_style_text_font(widgets->stat_phases_label, &font_sans_14, LV_PART_MAIN);
     lv_label_set_text(widgets->stat_phases_label, "-");
