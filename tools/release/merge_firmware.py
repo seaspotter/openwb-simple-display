@@ -6,7 +6,7 @@ project's Ed25519 release key via `openssl` (see include/ota_signing_pubkey.h).
 
 Usage:
     python3 merge_firmware.py --build-dir .pio/build/guition_4848s040c \\
-        --project-dir . --version 1.2.0 --base-url https://<user>.github.io/openwb-display \\
+        --project-dir . --version 1.2.0 --base-url https://<user>.github.io/openwb-simple-display \\
         --private-key-file /path/to/ota_signing_private.pem
 """
 
@@ -63,7 +63,7 @@ def main():
     parser.add_argument("--project-dir", required=True, type=Path)
     parser.add_argument("--version", required=True)
     parser.add_argument("--base-url", required=True,
-                         help="e.g. https://<user>.github.io/openwb-display")
+                         help="e.g. https://<user>.github.io/openwb-simple-display")
     parser.add_argument("--board-slug", default="guition_4848s040c")
     parser.add_argument("--private-key-file", type=Path, default=None,
                          help="Ed25519 private key (PEM) to sign the release with. "

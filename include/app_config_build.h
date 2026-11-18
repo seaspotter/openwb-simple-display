@@ -13,4 +13,4 @@
 // Default device-facing OTA manifest, hosted on the project's GitHub Pages site.
 // Overridable at runtime via AppConfig::ota_manifest_url.
 #define DEFAULT_OTA_MANIFEST_URL \
-    "https://seaspotter.github.io/openwb-display/firmware/ota/manifest.json"
+    "https://seaspotter.github.io/openwb-simple-display/firmware/ota/manifest.json"

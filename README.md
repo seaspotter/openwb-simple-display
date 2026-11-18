@@ -1,6 +1,6 @@
 # openwb-simple-display
 
-[![Build and test](https://github.com/seaspotter/openwb-display/actions/workflows/build.yml/badge.svg)](https://github.com/seaspotter/openwb-display/actions/workflows/build.yml)
+[![Build and test](https://github.com/seaspotter/openwb-simple-display/actions/workflows/build.yml/badge.svg)](https://github.com/seaspotter/openwb-simple-display/actions/workflows/build.yml)
 
 Ein kleines ESP32-S3-Touchscreen-Display für [openWB](https://openwb.de/)-Ladestationen:
 Ladepunkt-Status auf einen Blick, Touch-/Wisch-Steuerung von Lademodus, Ladestrom und
@@ -17,8 +17,8 @@ Projekt.
   <img src="docs/assets/screenshot-popup-instant.png" width="200" alt="Einstellungen-Popup Sofortladen" />
 </p>
 
-📖 **[Projektseite](https://seaspotter.github.io/openwb-display/)** ·
-**[Vollständige Anleitung](https://seaspotter.github.io/openwb-display/anleitung/)**
+📖 **[Projektseite](https://seaspotter.github.io/openwb-simple-display/)** ·
+**[Vollständige Anleitung](https://seaspotter.github.io/openwb-simple-display/anleitung/)**
 
 ## Status
 
