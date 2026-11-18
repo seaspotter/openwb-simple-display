@@ -310,7 +310,7 @@ bool Connect() {
     g_mqtt.setCallback(OnMessage);
     g_mqtt.setBufferSize(kMqttBufferSize);
 
-    char client_id[40];
+    char client_id[48]; // device_name (<=31 chars) + '-' + 8 hex chars + NUL
     snprintf(client_id, sizeof(client_id), "%s-%08x", cfg.device_name,
               static_cast<unsigned>(ESP.getEfuseMac() & 0xFFFFFFFF));
 

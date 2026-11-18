@@ -127,10 +127,7 @@ UpdateCheckResult CheckForUpdate(bool auto_triggered) {
 // would silently leave the device on its old firmware with no error shown — the
 // confirmed cause of a report where neither of two prior releases ever actually landed
 // despite "Installation läuft" being shown.
-void InstallTaskBody(void* param) {
-    bool force = *static_cast<bool*>(param);
-    delete static_cast<bool*>(param);
-
+void InstallTaskBody(void* /*param*/) {
     auto fail = [](const char* reason) {
         strlcpy(g_install_failure_reason, reason, sizeof(g_install_failure_reason));
         util::LogError(kTag, reason);
@@ -290,11 +287,9 @@ InstallResult StartInstall(bool force) {
     g_install_progress = 0;
     g_install_in_progress = true;
 
-    auto* force_copy = new bool(force);
-    BaseType_t created = xTaskCreatePinnedToCore(InstallTaskBody, "ota_install", 12288, force_copy,
+    BaseType_t created = xTaskCreatePinnedToCore(InstallTaskBody, "ota_install", 12288, nullptr,
                                                   1, nullptr, 0);
     if (created != pdPASS) {
-        delete force_copy;
         g_install_in_progress = false;
         g_install_progress = -1;
         strlcpy(result.reason, "Installations-Task konnte nicht gestartet werden", sizeof(result.reason));
