@@ -59,10 +59,19 @@ void ConfigStore::Load() {
 }
 
 void ConfigStore::Migrate(AppConfig& loaded_config, uint8_t from_version) {
-    // No prior schema versions exist yet; add a `case N:` here when one does.
-    util::LogWarn(kTag, "unknown config schema version, resetting to defaults");
+    // Load()'s byte-prefix copy already carried every existing field forward correctly
+    // for the common case (a pure field addition, which is the only kind of schema
+    // change this project's convention allows — see kCurrentSchemaVersion's comment) —
+    // this just updates the version stamp. Resetting to defaults here, as this used to
+    // unconditionally do, would silently undo that prefix copy's whole point: it ran on
+    // every schema bump (since schema_version is itself the first, always-copied field),
+    // wiping WiFi/MQTT/PIN/chargepoint IDs on every firmware update that added a field —
+    // confirmed as the actual behavior this exact release would have shipped with.
+    // A genuinely incompatible change (a field reordered, resized, or removed, not just
+    // appended) would need real handling added here instead of just the version bump.
+    util::LogInfo(kTag, "config schema upgraded");
     (void)from_version;
-    loaded_config = DefaultConfig();
+    loaded_config.schema_version = kCurrentSchemaVersion;
 }
 
 const AppConfig& ConfigStore::Get() {

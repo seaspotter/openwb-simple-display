@@ -100,9 +100,13 @@ void NetTask(void* /*param*/) {
         if (cfg.ota_auto_check && now - last_ota_check_ms >= cfg.ota_check_interval_s * 1000UL) {
             if (ota::ShouldAttemptAutomaticInstall()) {
                 ota::UpdateCheckResult check = ota::CheckForUpdate(/*auto_triggered=*/true);
-                if (cfg.ota_auto_install && check.success && check.update_available) {
-                    // force=false: StartInstall() still re-checks charging state itself
-                    // right before installing, in case it started during the check.
+                // Re-checked here, not just before the check above: StartInstall()
+                // itself only re-checks charging state (correct for a manual install,
+                // where tapping "install" is itself a touch — see its own comment), not
+                // touch recency, so a touch during the check's network round-trip
+                // wouldn't otherwise block an automatic install as the UI/docs promise.
+                if (cfg.ota_auto_install && check.success && check.update_available &&
+                    ota::ShouldAttemptAutomaticInstall()) {
                     ota::StartInstall(/*force=*/false);
                 }
             }
