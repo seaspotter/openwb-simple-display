@@ -10,8 +10,21 @@
 //     "sha256": "<hex digest>",
 //     "signature": "<hex Ed25519 signature, 64 bytes, see include/ota_signing_pubkey.h>",
 //     "size_bytes": 1234567
+//   },
+//   "filesystem": {
+//     "url": "https://.../firmware/littlefs.bin",
+//     "sha256": "<hex digest>",
+//     "signature": "<hex Ed25519 signature>",
+//     "size_bytes": 1234567
 //   }
 // }
+// "filesystem" is optional — an OTA install proceeds without it (app-only), logging a
+// warning, rather than refusing the whole update over a missing/stale web UI. Without
+// this field (and the matching flash step in ota_manager.cpp), an OTA update would
+// silently never update the web UI's static assets at all: they live on a separate
+// LittleFS partition that only the ESP Web Tools / USB install path (docs/manifest.json)
+// ever wrote to — confirmed as the actual cause of a real device staying on old web UI
+// JS/HTML indefinitely across several working OTA updates.
 #pragma once
 
 #include <cstdint>
@@ -29,6 +42,13 @@ struct Manifest {
     char firmware_sha256[65] = "";    // hex-encoded, 64 chars + NUL
     char firmware_signature[129] = ""; // hex-encoded Ed25519 signature, 128 chars + NUL
     uint32_t firmware_size_bytes = 0;
+
+    // All empty/zero if the manifest has no "filesystem" field — ota_manager.cpp treats
+    // that as "skip the filesystem update", not an error.
+    char filesystem_url[160] = "";
+    char filesystem_sha256[65] = "";
+    char filesystem_signature[129] = "";
+    uint32_t filesystem_size_bytes = 0;
 };
 
 namespace detail {
@@ -50,6 +70,12 @@ inline bool ParseManifestJson(JsonVariantConst doc, Manifest& out) {
     detail::CopyField(out.firmware_signature, sizeof(out.firmware_signature),
                        doc["firmware"]["signature"] | "");
     out.firmware_size_bytes = doc["firmware"]["size_bytes"] | 0;
+    detail::CopyField(out.filesystem_url, sizeof(out.filesystem_url), doc["filesystem"]["url"] | "");
+    detail::CopyField(out.filesystem_sha256, sizeof(out.filesystem_sha256),
+                       doc["filesystem"]["sha256"] | "");
+    detail::CopyField(out.filesystem_signature, sizeof(out.filesystem_signature),
+                       doc["filesystem"]["signature"] | "");
+    out.filesystem_size_bytes = doc["filesystem"]["size_bytes"] | 0;
     return out.latest_version[0] != '\0' && out.firmware_url[0] != '\0';
 }
 

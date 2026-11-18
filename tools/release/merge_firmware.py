@@ -137,8 +137,22 @@ def main():
         "sha256": app_sha256,
         "size_bytes": (firmware_dir / app_name).stat().st_size,
     }
+
+    # Signed and included the same way as the app binary — without this, an OTA update
+    # only ever replaces the app partition, never the LittleFS partition the web UI's
+    # static assets live on, so devices updated purely via OTA would be stuck on
+    # whatever web UI version was last written over USB, indefinitely.
+    littlefs_url = f"{args.base_url}/firmware/littlefs.bin"
+    littlefs_sha256 = sha256_of(firmware_dir / "littlefs.bin")
+    filesystem_field = {
+        "url": littlefs_url,
+        "sha256": littlefs_sha256,
+        "size_bytes": (firmware_dir / "littlefs.bin").stat().st_size,
+    }
+
     if args.private_key_file is not None:
         firmware_field["signature"] = sign_digest_hex(app_sha256, args.private_key_file)
+        filesystem_field["signature"] = sign_digest_hex(littlefs_sha256, args.private_key_file)
     else:
         print("WARNING: --allow-unsigned set — manifest has no signature; "
               "no device will accept this as an OTA update", file=sys.stderr)
@@ -148,6 +162,7 @@ def main():
         "min_supported_version": args.min_supported_version,
         "release_notes_url": f"{args.base_url}/releases/{args.version}.html",
         "firmware": firmware_field,
+        "filesystem": filesystem_field,
     }
     (firmware_dir / "ota" / "manifest.json").write_text(json.dumps(ota_manifest, indent=2))
 

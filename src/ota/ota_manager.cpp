@@ -6,6 +6,7 @@
 
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
+#include <LittleFS.h>
 #include <Update.h>
 #include <WiFiClientSecure.h>
 #include <esp_ota_ops.h>
@@ -118,6 +119,124 @@ UpdateCheckResult CheckForUpdate(bool auto_triggered) {
     return result;
 }
 
+// Downloads one artifact (app binary or filesystem image), verifies its sha256 and
+// Ed25519 signature against the actual downloaded bytes, and flashes it via `command`/
+// `label` (see Update::begin()). `baseline`/`total` let the caller report progress
+// across more than one artifact in a single 0-100 scale (see InstallTaskBody). Returns
+// false and fills `error` on any failure; never calls Update.end(true) on a verification
+// failure, so a bad download can't leave a partially-written partition marked bootable.
+bool DownloadVerifyAndFlash(const char* url, const char* sha256_hex, const char* signature_hex, int command,
+                             const char* label, uint32_t baseline, uint32_t total, char* error,
+                             size_t error_size) {
+    WiFiClientSecure client;
+    ApplyCaCertBundle(client);
+
+    HTTPClient http;
+    if (!http.begin(client, url)) {
+        strlcpy(error, "Download konnte nicht gestartet werden", error_size);
+        return false;
+    }
+
+    int status = http.GET();
+    if (status != HTTP_CODE_OK) {
+        http.end();
+        strlcpy(error, "HTTP-Fehler beim Download", error_size);
+        return false;
+    }
+
+    int content_length = http.getSize();
+    if (!Update.begin(content_length > 0 ? content_length : UPDATE_SIZE_UNKNOWN, command, -1, LOW, label)) {
+        http.end();
+        strlcpy(error, "nicht genug Platz auf der Zielpartition", error_size);
+        return false;
+    }
+
+    uint8_t expected_sha256[32];
+    bool have_expected_hash = HexToBytes(sha256_hex, expected_sha256, 32);
+    if (!have_expected_hash) {
+        util::LogWarn(kTag, "manifest sha256 missing/malformed — signature check below still applies");
+    }
+
+    uint8_t expected_signature[64];
+    bool have_expected_signature = HexToBytes(signature_hex, expected_signature, 64);
+    if (!have_expected_signature) {
+        // Refused outright, not just logged — otherwise signing could be bypassed by
+        // simply omitting the field.
+        http.end();
+        Update.abort();
+        strlcpy(error, "Manifest enthält keine gültige Signatur", error_size);
+        return false;
+    }
+
+    mbedtls_sha256_context sha_ctx;
+    mbedtls_sha256_init(&sha_ctx);
+    mbedtls_sha256_starts(&sha_ctx, /*is224=*/0);
+
+    auto* stream = http.getStreamPtr(); // type name differs across arduino-esp32 versions
+    uint8_t buf[4096];
+    int written_total = 0;
+
+    while (http.connected() && (content_length < 0 || written_total < content_length)) {
+        size_t available = stream->available();
+        if (available == 0) {
+            vTaskDelay(pdMS_TO_TICKS(1));
+            continue;
+        }
+        size_t chunk = std::min(available, sizeof(buf));
+        size_t read_bytes = stream->readBytes(buf, chunk);
+        if (read_bytes == 0) break;
+
+        size_t written = Update.write(buf, read_bytes);
+        if (written != read_bytes) {
+            Update.abort();
+            http.end();
+            mbedtls_sha256_free(&sha_ctx);
+            strlcpy(error, "Flash-Schreibfehler beim Download", error_size);
+            return false;
+        }
+        mbedtls_sha256_update(&sha_ctx, buf, read_bytes);
+        written_total += read_bytes;
+
+        if (total > 0) {
+            g_install_progress = static_cast<int>(((baseline + written_total) * 100) / total);
+        }
+        // This task's own stand-in for yielding during a tight run of back-to-back
+        // available chunks, which could otherwise starve this task's watchdog feeding
+        // (see InstallTaskBody's own comment — running off the caller's task already
+        // solved the UI/web-server-blocking half of that problem).
+        taskYIELD();
+    }
+    http.end();
+
+    uint8_t actual_sha256[32];
+    mbedtls_sha256_finish(&sha_ctx, actual_sha256);
+    mbedtls_sha256_free(&sha_ctx);
+
+    // Checked separately from the signature below for a clearer error on plain corruption.
+    bool hash_ok = !have_expected_hash || (memcmp(actual_sha256, expected_sha256, 32) == 0);
+    if (!hash_ok) {
+        Update.abort();
+        strlcpy(error, "sha256 stimmt nicht überein", error_size);
+        return false;
+    }
+
+    // Verified against the actual downloaded digest, not the manifest's own claimed
+    // sha256 — catches a tampered binary even if that field was forged to match it.
+    bool signature_ok =
+        ed25519_verify(expected_signature, actual_sha256, sizeof(actual_sha256), kOtaSigningPublicKey) != 0;
+    if (!signature_ok) {
+        Update.abort();
+        strlcpy(error, "Signaturprüfung fehlgeschlagen", error_size);
+        return false;
+    }
+
+    if (!Update.end(true)) {
+        strlcpy(error, "Flash-Schreibvorgang wurde nicht korrekt abgeschlossen", error_size);
+        return false;
+    }
+    return true;
+}
+
 // Runs on its own dedicated task (see StartInstall) — never on the caller's task.
 // Downloading ~1.6MB and writing it to flash takes anywhere from several seconds to
 // over a minute depending on WiFi throughput; running that inline on the calling task
@@ -136,112 +255,35 @@ void InstallTaskBody(void* /*param*/) {
         vTaskDelete(nullptr); // unreachable past this point
     };
 
-    WiFiClientSecure client;
-    ApplyCaCertBundle(client);
-
-    HTTPClient http;
-    if (!http.begin(client, g_last_manifest.firmware_url)) {
-        fail("Firmware-Download konnte nicht gestartet werden");
-        return;
-    }
-
-    int status = http.GET();
-    if (status != HTTP_CODE_OK) {
-        http.end();
-        fail("HTTP-Fehler beim Firmware-Download");
-        return;
-    }
-
-    int content_length = http.getSize();
-    if (!Update.begin(content_length > 0 ? content_length : UPDATE_SIZE_UNKNOWN)) {
-        http.end();
-        fail("nicht genug Platz auf der inaktiven OTA-Partition");
-        return;
-    }
-
-    uint8_t expected_sha256[32];
-    bool have_expected_hash = HexToBytes(g_last_manifest.firmware_sha256, expected_sha256, 32);
-    if (!have_expected_hash) {
-        util::LogWarn(kTag, "manifest sha256 missing/malformed — signature check below still applies");
-    }
-
-    uint8_t expected_signature[64];
-    bool have_expected_signature =
-        HexToBytes(g_last_manifest.firmware_signature, expected_signature, 64);
-    if (!have_expected_signature) {
-        // Refused outright, not just logged — otherwise signing could be bypassed by
-        // simply omitting the field.
-        http.end();
-        fail("Manifest enthält keine gültige Signatur");
-        return;
-    }
-
-    mbedtls_sha256_context sha_ctx;
-    mbedtls_sha256_init(&sha_ctx);
-    mbedtls_sha256_starts(&sha_ctx, /*is224=*/0);
-
-    auto* stream = http.getStreamPtr(); // type name differs across arduino-esp32 versions
-    uint8_t buf[4096];
-    int written_total = 0;
+    bool have_filesystem = g_last_manifest.filesystem_url[0] != '\0';
+    uint32_t total_bytes = g_last_manifest.firmware_size_bytes +
+                            (have_filesystem ? g_last_manifest.filesystem_size_bytes : 0);
     g_install_progress = 0;
 
-    while (http.connected() && (content_length < 0 || written_total < content_length)) {
-        size_t available = stream->available();
-        if (available == 0) {
-            vTaskDelay(pdMS_TO_TICKS(1));
-            continue;
-        }
-        size_t chunk = std::min(available, sizeof(buf));
-        size_t read_bytes = stream->readBytes(buf, chunk);
-        if (read_bytes == 0) break;
-
-        size_t written = Update.write(buf, read_bytes);
-        if (written != read_bytes) {
-            Update.abort();
-            http.end();
-            fail("Flash-Schreibfehler beim Download");
-            return;
-        }
-        mbedtls_sha256_update(&sha_ctx, buf, read_bytes);
-        written_total += read_bytes;
-
-        if (content_length > 0) {
-            g_install_progress = (written_total * 100) / content_length;
-        }
-        // Running on a dedicated task now (not the UI/web-request task), so this isn't
-        // needed to keep the rest of the system responsive — it's here so this task
-        // itself always yields at least once per chunk instead of only when the
-        // network stalls, which is what made a tight run of back-to-back available
-        // chunks able to starve this task's own watchdog feeding.
-        taskYIELD();
-    }
-    http.end();
-
-    uint8_t actual_sha256[32];
-    mbedtls_sha256_finish(&sha_ctx, actual_sha256);
-    mbedtls_sha256_free(&sha_ctx);
-
-    // Checked separately from the signature below for a clearer error on plain corruption.
-    bool hash_ok = !have_expected_hash || (memcmp(actual_sha256, expected_sha256, 32) == 0);
-    if (!hash_ok) {
-        Update.abort();
-        fail("sha256 stimmt nicht überein");
+    char error[96] = "";
+    if (!DownloadVerifyAndFlash(g_last_manifest.firmware_url, g_last_manifest.firmware_sha256,
+                                 g_last_manifest.firmware_signature, U_FLASH, nullptr,
+                                 /*baseline=*/0, total_bytes, error, sizeof(error))) {
+        fail(error);
         return;
     }
 
-    // Verified against the actual downloaded digest, not the manifest's own claimed
-    // sha256 — catches a tampered binary even if that field was forged to match it.
-    bool signature_ok =
-        ed25519_verify(expected_signature, actual_sha256, sizeof(actual_sha256), kOtaSigningPublicKey) != 0;
-    if (!signature_ok) {
-        Update.abort();
-        fail("Signaturprüfung fehlgeschlagen");
-        return;
-    }
-
-    if (!Update.end(true)) {
-        fail("Flash-Schreibvorgang wurde nicht korrekt abgeschlossen");
-        return;
+    // Best-effort, not fatal: the app partition is already flashed and verified at this
+    // point, so the device will still boot and function (MQTT, display, touch) even if
+    // the web UI's static assets end up stale — better than refusing a working firmware
+    // update over a filesystem-image problem. Without this step at all, though, an OTA
+    // update would *never* update the web UI (see ota_manifest.h's header comment).
+    if (have_filesystem) {
+        // Unmounted first: writing raw partition bytes underneath an actively-mounted
+        // LittleFS (the web server reads from it on every request) risks a corrupted
+        // read mid-write; nothing remounts it since this always ends in a reboot anyway.
+        LittleFS.end();
+        if (!DownloadVerifyAndFlash(g_last_manifest.filesystem_url, g_last_manifest.filesystem_sha256,
+                                     g_last_manifest.filesystem_signature, U_SPIFFS, "littlefs",
+                                     g_last_manifest.firmware_size_bytes, total_bytes, error, sizeof(error))) {
+            util::LogWarn(kTag, "filesystem image update failed, continuing with new firmware anyway");
+            util::LogWarn(kTag, error);
+        }
     }
 
     g_install_progress = 100;

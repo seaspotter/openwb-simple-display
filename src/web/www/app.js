@@ -205,8 +205,16 @@ function startOtaPoll() {
   stopOtaPoll();
   const el = document.getElementById("ota-status");
   otaPollTimer = setInterval(async () => {
+    // A plain fetch() with no timeout can sit for a very long time (well past typical
+    // browser/OS TCP timeouts for a local device that just vanished mid-reboot without
+    // a clean connection close) before ever rejecting — observed as the status text
+    // getting stuck at its last-seen percentage indefinitely, with the device already
+    // back up on the new version, until the page was manually reloaded. 3s is generous
+    // for a device on the same local network that's actually still there.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
     try {
-      const res = await fetch("/api/ota/progress");
+      const res = await fetch("/api/ota/progress", { signal: controller.signal });
       const progress = await res.json();
       if (progress.failure_reason) {
         el.textContent = `Fehlgeschlagen: ${progress.failure_reason}`;
@@ -217,9 +225,13 @@ function startOtaPoll() {
         el.textContent = "Installation abgeschlossen — Neustart folgt.";
       }
     } catch {
-      // The device likely just rebooted into the new firmware mid-request.
+      // The device likely just rebooted into the new firmware mid-request (or this
+      // poll's own 3s timeout fired for the same reason) — treated as success, not an
+      // error, since that's the expected end of a working install.
       el.textContent = "Neustart — bitte Seite in Kürze neu laden.";
       stopOtaPoll();
+    } finally {
+      clearTimeout(timeoutId);
     }
   }, 1000);
 }
