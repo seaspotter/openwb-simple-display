@@ -1,5 +1,6 @@
 #include "config_store.h"
 
+#include <algorithm>
 #include <cstring>
 
 #include "config_defaults.h"
@@ -23,10 +24,19 @@ void ConfigStore::Load() {
     Preferences prefs;
     if (prefs.begin(kNamespace, /*readOnly=*/true)) {
         size_t stored_size = prefs.getBytesLength(kBlobKey);
-        if (stored_size == sizeof(AppConfig)) {
-            prefs.getBytes(kBlobKey, &loaded, sizeof(AppConfig));
-        } else if (stored_size > 0) {
-            util::LogWarn(kTag, "stored config size mismatch, using defaults");
+        if (stored_size > 0) {
+            // AppConfig schema changes are append-only (new fields added at the end —
+            // see kCurrentSchemaVersion's comment in app_config.h); reading only the
+            // overlapping byte prefix preserves every existing field's value across a
+            // firmware update that adds one, leaving just the new trailing field(s) at
+            // their struct-default values. Previously any size change at all (i.e. any
+            // OTA update that added a single field) silently discarded the entire saved
+            // config — WiFi, MQTT, chargepoint IDs, PIN, everything — back to defaults.
+            size_t copy_size = std::min(stored_size, sizeof(AppConfig));
+            prefs.getBytes(kBlobKey, &loaded, copy_size);
+            if (stored_size != sizeof(AppConfig)) {
+                util::LogWarn(kTag, "stored config size differs from current schema, migrated by prefix");
+            }
         }
         prefs.end();
     }

@@ -36,6 +36,8 @@ async function loadConfig() {
 
   document.getElementById("device-title").textContent = cfg.device_name;
   document.getElementById("ota_auto_check").value = String(cfg.ota_auto_check);
+  document.getElementById("ota_auto_install").value = String(cfg.ota_auto_install);
+  updateOtaAutoInstallVisibility();
   document.getElementById("mqtt_host").value = cfg.mqtt_host || "";
   document.getElementById("mqtt_port").value = cfg.mqtt_port || 1883;
   document.getElementById("mqtt_username").value = cfg.mqtt_username || "";
@@ -65,6 +67,11 @@ function toTimeInput(hour, minute) {
 function updateScheduleFieldsVisibility() {
   const mode = document.getElementById("dark_mode_schedule").value;
   document.getElementById("schedule-time-fields").style.display = mode === "1" ? "block" : "none";
+}
+
+function updateOtaAutoInstallVisibility() {
+  const checking = document.getElementById("ota_auto_check").value === "true";
+  document.getElementById("ota-auto-install-field").style.display = checking ? "block" : "none";
 }
 
 async function loadStatus() {
@@ -127,6 +134,7 @@ function readSettingsForm() {
 
   const body = {
     ota_auto_check: document.getElementById("ota_auto_check").value === "true",
+    ota_auto_install: document.getElementById("ota_auto_install").value === "true",
     mqtt_host: document.getElementById("mqtt_host").value,
     mqtt_port: parseInt(document.getElementById("mqtt_port").value, 10),
     mqtt_username: document.getElementById("mqtt_username").value,
@@ -294,6 +302,7 @@ document.getElementById("install-update-btn").addEventListener("click", installU
 document.getElementById("reset-wifi-btn").addEventListener("click", resetWifi);
 document.getElementById("set-pin-btn").addEventListener("click", setWebUiPin);
 document.getElementById("dark_mode_schedule").addEventListener("change", updateScheduleFieldsVisibility);
+document.getElementById("ota_auto_check").addEventListener("change", updateOtaAutoInstallVisibility);
 
 initWebUiTheme();
 loadConfig();

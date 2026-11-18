@@ -8,8 +8,11 @@
 
 namespace config {
 
-// Bump on any field add/remove/retype; config_store.cpp::Migrate() handles the rest.
-inline constexpr uint8_t kCurrentSchemaVersion = 4; // v4: added dark_mode auto-schedule fields
+// Bump on any field add/remove/retype — purely informational now: config_store.cpp's
+// Load() reads the overlapping byte prefix regardless, so a field add/remove still
+// requires fields to only ever be appended at the end of this struct, never reordered
+// or resized, or older devices' saved bytes would land in the wrong field on upgrade.
+inline constexpr uint8_t kCurrentSchemaVersion = 5; // v5: added ota_auto_install
 
 enum class DarkModeSchedule : uint8_t {
     kManual = 0,       // "Darstellung" dropdown is the only thing that sets dark_mode
@@ -53,11 +56,17 @@ struct AppConfig {
     uint8_t schedule_light_start_hour = 7;
     uint8_t schedule_light_start_min = 0;
 
-    bool ota_auto_check = true; // background checks only notify, never auto-install
+    bool ota_auto_check = true; // background checks only notify, unless ota_auto_install too
     char ota_manifest_url[128] = DEFAULT_OTA_MANIFEST_URL;
     uint32_t ota_check_interval_s = 21600;
 
     char device_name[32] = PROJECT_NAME;
+
+    // Opt-in: if an ota_auto_check finds an update, install it right away instead of
+    // only showing the status-bar icon. Still subject to the same idle/not-charging
+    // gate as a manual install (ota_gate.cpp) — never installs while a chargepoint is
+    // charging or the display was touched recently.
+    bool ota_auto_install = false;
 };
 
 } // namespace config

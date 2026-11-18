@@ -99,7 +99,12 @@ void NetTask(void* /*param*/) {
 
         if (cfg.ota_auto_check && now - last_ota_check_ms >= cfg.ota_check_interval_s * 1000UL) {
             if (ota::ShouldAttemptAutomaticInstall()) {
-                ota::CheckForUpdate(/*auto_triggered=*/true);
+                ota::UpdateCheckResult check = ota::CheckForUpdate(/*auto_triggered=*/true);
+                if (cfg.ota_auto_install && check.success && check.update_available) {
+                    // force=false: StartInstall() still re-checks charging state itself
+                    // right before installing, in case it started during the check.
+                    ota::StartInstall(/*force=*/false);
+                }
             }
             last_ota_check_ms = now;
         }

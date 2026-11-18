@@ -114,8 +114,8 @@
         fehlt.</span></li>
       <li><img class="icon" src="../assets/icons/icon-cloud-download-accent.svg" alt="" />
         <span>Erscheint nur, wenn eine neue Firmware-Version gefunden wurde (automatisch
-        oder manuell geprüft). Antippen des Zahnrads daneben führt zu den Einstellungen,
-        wo das Update installiert werden kann.</span></li>
+        oder manuell geprüft). Installiert wird in der <a href="#weboberflaeche">Weboberfläche</a>,
+        nicht am Display — siehe <a href="#update">Firmware-Updates</a>.</span></li>
       <li><img class="icon" src="../assets/icons/icon-alert-triangle-warning.svg" alt="" />
         <span>Erscheint, wenn ein konfigurierter Ladepunkt einen Fehler meldet.</span></li>
       <li><img class="icon" src="../assets/icons/icon-settings-muted.svg" alt="" />
@@ -301,16 +301,23 @@
 
   <section class="panel" id="update">
     <h2>Firmware-Updates</h2>
-    <p>Prüfung und Installation sind getrennt: eine automatische Prüfung im Hintergrund
-      (standardmäßig alle 6&nbsp;Stunden, abschaltbar in der Weboberfläche) zeigt bei
-      einem Fund nur ein Symbol in der Statusleiste — sie <strong>installiert nie von
-      selbst</strong>. Installiert wird immer explizit:</p>
+    <p>Das Display selbst kann Updates nur noch <strong>prüfen</strong>, nicht mehr
+      installieren — die eigentliche Installation (ein Flash-Schreibvorgang) kann das
+      Display kurzzeitig sichtbar flackern lassen, was während des Zuschauens am
+      Display selbst unschön wäre. Installiert wird deshalb ausschließlich über die
+      Weboberfläche:</p>
     <ol class="steps">
-      <li>„Auf Update prüfen" am Display oder in der Weboberfläche antippen (oder
-        einfach auf das automatisch erschienene Symbol reagieren).</li>
-      <li>Wird eine neuere Version gefunden, erscheint „Update installieren".</li>
-      <li>Lädt gerade ein Ladepunkt, kommt eine Rückfrage, ob trotzdem installiert werden
-        soll.</li>
+      <li>Eine automatische Prüfung im Hintergrund (standardmäßig alle 6&nbsp;Stunden,
+        abschaltbar in der Weboberfläche) zeigt bei einem Fund ein Symbol in der
+        Statusleiste. Am Display lässt sich zusätzlich jederzeit über „Auf Update
+        prüfen" manuell geprüft werden — das lädt nur die Versionsinfo, kein
+        Flash-Schreibvorgang.</li>
+      <li>Installiert wird in der Weboberfläche über „Update installieren". Lädt gerade
+        ein Ladepunkt, kommt eine Rückfrage, ob trotzdem installiert werden soll.</li>
+      <li>Alternativ „Automatisch installieren" in der Weboberfläche aktivieren
+        (standardmäßig aus): findet die 6-stündliche Prüfung dann ein Update, wird es
+        von selbst installiert — nie während ein Ladepunkt lädt oder das Display gerade
+        berührt wurde.</li>
       <li>Nach der Installation startet das Display automatisch mit der neuen Version
         neu.</li>
     </ol>
@@ -349,8 +356,9 @@
       Energiefluss-Diagramm ein-/ausblenden, Darstellung (Hell/Dunkel) sowie der
       <a href="#darstellung">automatische Hell/Dunkel-Wechsel</a>.</p>
     <h3>Firmware</h3>
-    <p>Version, automatische Update-Prüfung ein-/ausschalten, manuelle Prüfung/Installation,
-      sowie der Link zur <strong>Geräte-Status-Seite</strong> (Laufzeit, freier
+    <p>Version, automatische Update-Prüfung ein-/ausschalten, automatische Installation
+      ein-/ausschalten, manuelle Prüfung/Installation, sowie der Link zur
+      <strong>Geräte-Status-Seite</strong> (Laufzeit, freier
       Speicher, Flash- und Dateisystem-Belegung, Chip-Temperatur, WLAN-Signalstärke,
       MQTT-Verbindungsstatus) — reine Diagnose-Informationen, nichts davon ist
       einstellbar.</p>

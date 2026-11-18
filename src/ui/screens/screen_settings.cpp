@@ -1,7 +1,5 @@
 #include "screen_settings.h"
 
-#include <cstring>
-
 #include <lvgl.h>
 
 #include "app_config_build.h"
@@ -19,8 +17,6 @@ namespace screens {
 namespace {
 
 lv_obj_t* g_ota_status_label = nullptr;
-lv_obj_t* g_install_button = nullptr;
-lv_timer_t* g_install_poll_timer = nullptr;
 
 constexpr int32_t kBrightnessMinPct = 10;
 constexpr int32_t kBrightnessMaxPct = 100;
@@ -50,13 +46,6 @@ void OnBrightnessStep(lv_event_t* e) {
     state::State().SetPendingBrightnessSave(static_cast<uint8_t>(state->value_pct), lv_tick_get());
 }
 
-void StopInstallPollTimer() {
-    if (g_install_poll_timer != nullptr) {
-        lv_timer_del(g_install_poll_timer);
-        g_install_poll_timer = nullptr;
-    }
-}
-
 void OnBackTapped(lv_event_t* e) {
     lv_obj_t* previous = static_cast<lv_obj_t*>(lv_event_get_user_data(e));
     lv_obj_t* settings_screen = lv_screen_active();
@@ -70,71 +59,7 @@ void OnBrightnessStateDeleted(lv_event_t* e) {
     delete static_cast<BrightnessState*>(lv_event_get_user_data(e));
 }
 
-// Without this, navigating back while an install is still downloading would leave the
-// poll timer below writing into g_ota_status_label/g_install_button after this screen
-// (and those labels) have already been deleted — a use-after-free.
-void OnSettingsScreenDeleted(lv_event_t* /*e*/) { StopInstallPollTimer(); }
-
 void OnResetWifiTapped(lv_event_t* /*e*/) { ui::ShowWifiResetPrompt(); }
-
-// Polls ota::StartInstall()'s now-async result — the actual download+flash runs on its
-// own task (see ota_manager.cpp), not here, so this just reflects its progress.
-void OnInstallPollTick(lv_timer_t* /*timer*/) {
-    const char* failure = ota::InstallFailureReason();
-    if (failure[0] != '\0') {
-        lv_label_set_text_fmt(g_ota_status_label, "Fehlgeschlagen: %s", failure);
-        StopInstallPollTimer();
-        return;
-    }
-    int progress = ota::InstallProgressPercent();
-    if (progress >= 0 && progress < 100) {
-        lv_label_set_text_fmt(g_ota_status_label, "Installiere… %d %%", progress);
-    } else if (progress >= 100) {
-        lv_label_set_text(g_ota_status_label, "Installation abgeschlossen — Neustart folgt.");
-    }
-}
-
-void DoInstall(bool force) {
-    ota::InstallResult result = ota::StartInstall(force);
-
-    if (result.started) {
-        lv_label_set_text(g_ota_status_label, "Installation läuft…");
-        StopInstallPollTimer();
-        g_install_poll_timer = lv_timer_create(OnInstallPollTick, 500, nullptr);
-        return;
-    }
-
-    if (strcmp(result.reason, "charging_active") == 0) {
-        lv_obj_t* mbox = lv_msgbox_create(nullptr);
-        lv_obj_t* title = lv_msgbox_add_title(mbox, "Ladevorgang aktiv");
-        theme::ApplyMsgboxFont(title);
-        lv_obj_t* text =
-            lv_msgbox_add_text(mbox, "Ein Ladepunkt lädt gerade. Update trotzdem installieren?");
-        theme::ApplyMsgboxFont(text);
-        lv_obj_t* confirm_btn = lv_msgbox_add_footer_button(mbox, "Installieren");
-        theme::ApplyMsgboxFont(confirm_btn);
-        lv_obj_t* cancel_btn = lv_msgbox_add_footer_button(mbox, "Abbrechen");
-        theme::ApplyMsgboxFont(cancel_btn);
-        // LVGL v9's footer buttons don't auto-dismiss the msgbox on click, so both paths
-        // must close it explicitly or it stays stuck on screen forever.
-        lv_obj_add_event_cb(
-            confirm_btn,
-            [](lv_event_t* e) {
-                lv_msgbox_close(static_cast<lv_obj_t*>(lv_event_get_user_data(e)));
-                DoInstall(/*force=*/true);
-            },
-            LV_EVENT_CLICKED, mbox);
-        lv_obj_add_event_cb(
-            cancel_btn,
-            [](lv_event_t* e) { lv_msgbox_close(static_cast<lv_obj_t*>(lv_event_get_user_data(e))); },
-            LV_EVENT_CLICKED, mbox);
-        return;
-    }
-
-    lv_label_set_text_fmt(g_ota_status_label, "Fehlgeschlagen: %s", result.reason);
-}
-
-void OnInstallUpdateTapped(lv_event_t* /*e*/) { DoInstall(/*force=*/false); }
 
 // Quartz card: panel style, column flex, a small muted heading as the first child.
 lv_obj_t* CreateCard(lv_obj_t* parent, const char* heading, const theme::Palette& colors) {
@@ -154,6 +79,10 @@ lv_obj_t* CreateCard(lv_obj_t* parent, const char* heading, const theme::Palette
     return card;
 }
 
+// Check only — this screen can no longer trigger an install (see ShowSettingsScreen's
+// firmware card). A CheckForUpdate() call is a plain HTTPS GET, no flash write, so it's
+// the one OTA-related action still safe to do here without risking the display
+// corruption a flash write can cause.
 void OnCheckUpdateTapped(lv_event_t* /*e*/) {
     ota::UpdateCheckResult result = ota::CheckForUpdate(/*auto_triggered=*/false);
     if (!result.success) {
@@ -161,28 +90,22 @@ void OnCheckUpdateTapped(lv_event_t* /*e*/) {
         return;
     }
     if (result.update_available) {
-        lv_label_set_text_fmt(g_ota_status_label, "Update verfügbar: %s", result.latest_version);
-        lv_obj_remove_flag(g_install_button, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text_fmt(g_ota_status_label, "Update verfügbar: %s — Installation in der Weboberfläche.",
+                               result.latest_version);
     } else {
         lv_label_set_text(g_ota_status_label, "Aktuell — kein Update verfügbar.");
-        lv_obj_add_flag(g_install_button, LV_OBJ_FLAG_HIDDEN);
     }
 }
 
 } // namespace
 
 void ShowSettingsScreen() {
-    // A stale timer from a previous visit (e.g. one that was mid-install when the user
-    // navigated back) must not survive into this fresh screen's widgets.
-    StopInstallPollTimer();
-
     lv_obj_t* previous_screen = lv_screen_active();
     lv_obj_t* screen = lv_obj_create(nullptr);
     lv_obj_add_style(screen, theme::ScreenStyle(), LV_PART_MAIN);
     lv_obj_set_flex_flow(screen, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_all(screen, 12, LV_PART_MAIN);
     lv_obj_set_style_pad_row(screen, 10, LV_PART_MAIN);
-    lv_obj_add_event_cb(screen, OnSettingsScreenDeleted, LV_EVENT_DELETE, nullptr);
 
     const config::AppConfig& cfg = config::Store().Get();
     const theme::Palette& colors = theme::Colors(cfg.dark_mode);
@@ -241,12 +164,6 @@ void ShowSettingsScreen() {
     lv_obj_add_style(check_update_btn, theme::FlatButtonStyle(), LV_PART_MAIN);
     lv_label_set_text(lv_label_create(check_update_btn), "Auf Update prüfen");
     lv_obj_add_event_cb(check_update_btn, OnCheckUpdateTapped, LV_EVENT_CLICKED, nullptr);
-
-    g_install_button = lv_button_create(fw_card);
-    lv_obj_add_style(g_install_button, theme::FlatButtonStyle(), LV_PART_MAIN);
-    lv_label_set_text(lv_label_create(g_install_button), "Update installieren");
-    lv_obj_add_flag(g_install_button, LV_OBJ_FLAG_HIDDEN); // shown once a check finds one
-    lv_obj_add_event_cb(g_install_button, OnInstallUpdateTapped, LV_EVENT_CLICKED, nullptr);
 
     g_ota_status_label = lv_label_create(fw_card);
     lv_label_set_text(g_ota_status_label, "");

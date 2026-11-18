@@ -110,6 +110,7 @@ void HandleGetConfig(AsyncWebServerRequest* request) {
     doc["schedule_light_start_min"] = cfg.schedule_light_start_min;
     doc["show_flow_chart"] = cfg.show_flow_chart;
     doc["ota_auto_check"] = cfg.ota_auto_check;
+    doc["ota_auto_install"] = cfg.ota_auto_install;
     doc["ota_manifest_url"] = cfg.ota_manifest_url;
 
     SendJson(request, doc);
@@ -151,6 +152,7 @@ bool HandlePostConfig(AsyncWebServerRequest* request, JsonVariant& json) {
             c.schedule_light_start_min = body["schedule_light_start_min"];
         if (body["show_flow_chart"].is<bool>()) c.show_flow_chart = body["show_flow_chart"];
         if (body["ota_auto_check"].is<bool>()) c.ota_auto_check = body["ota_auto_check"];
+        if (body["ota_auto_install"].is<bool>()) c.ota_auto_install = body["ota_auto_install"];
         if (body["ota_manifest_url"].is<const char*>())
             strlcpy(c.ota_manifest_url, body["ota_manifest_url"], sizeof(c.ota_manifest_url));
         if (body["chargepoint_ids"].is<JsonArray>()) {
