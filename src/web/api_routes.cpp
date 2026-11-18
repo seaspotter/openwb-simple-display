@@ -1,6 +1,7 @@
 #include "api_routes.h"
 
 #include <algorithm>
+#include <cctype>
 
 #include <ArduinoJson.h>
 #include <AsyncJson.h>
@@ -173,6 +174,15 @@ bool HandleSetWebUiPin(AsyncWebServerRequest* request, JsonVariant& json) {
     if (!CheckAuth(request)) return false;
     JsonObject body = json.as<JsonObject>();
     const char* new_pin = body["pin"] | "";
+    // The on-device keypad (ui::RequirePin) can only ever enter digits — a PIN
+    // containing anything else, set here from a full keyboard, would lock the user out
+    // of the on-device settings screen/WiFi-reset with no way back short of reflashing.
+    for (const char* p = new_pin; *p != '\0'; ++p) {
+        if (!std::isdigit(static_cast<unsigned char>(*p))) {
+            request->send(400, "application/json", "{\"error\":\"PIN darf nur aus Ziffern bestehen\"}");
+            return false;
+        }
+    }
     config::Store().Update(
         [&](config::AppConfig& c) { strlcpy(c.web_ui_pin, new_pin, sizeof(c.web_ui_pin)); });
     return true;

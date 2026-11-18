@@ -297,8 +297,16 @@ void ShowStatusScreen(uint8_t chargepoint_count) {
     // once at boot.
     lv_obj_t* old_screen = lv_screen_active();
 
-    g_status_screen_shown_at_ms = lv_tick_get();
-    g_shown_no_data_hint = false;
+    // Grace period/hint state is seeded once per boot, not on every call — otherwise a
+    // scheduled dark/light flip (which also calls this) would reset the 10s grace timer
+    // and the shown-once flag, popping the hint back up on every later flip instead of
+    // at most once until the user fixes the chargepoint IDs or reboots.
+    static bool hint_state_initialized = false;
+    if (!hint_state_initialized) {
+        hint_state_initialized = true;
+        g_status_screen_shown_at_ms = lv_tick_get();
+        g_shown_no_data_hint = false;
+    }
 
     lv_obj_t* screen = lv_obj_create(nullptr);
     lv_obj_add_style(screen, theme::ScreenStyle(), LV_PART_MAIN);

@@ -247,7 +247,14 @@ async function installUpdate() {
 async function setWebUiPin() {
   const pin = document.getElementById("web_ui_pin").value;
   const res = await postJson("/api/webui/pin", { pin });
-  showToast(res.ok ? (pin ? "PIN gesetzt." : "PIN entfernt.") : "Fehlgeschlagen — falscher aktueller PIN?");
+  if (res.ok) {
+    showToast(pin ? "PIN gesetzt." : "PIN entfernt.");
+  } else if (res.status === 400) {
+    const body = await res.json().catch(() => ({}));
+    showToast(body.error || "Ungültiger PIN.");
+  } else {
+    showToast("Fehlgeschlagen — falscher aktueller PIN?");
+  }
   document.getElementById("web_ui_pin").value = "";
   loadConfig();
 }
