@@ -5,7 +5,7 @@
 #define PROJECT_NAME "openwb-simple-display"
 #endif
 
-#define FW_VERSION "0.1.7"
+#define FW_VERSION "0.1.8"
 
 // Captive-portal AP SSID shown on first boot / after a WiFi reset.
 #define AP_SSID_SUFFIX "-setup" // -> "openwb-simple-display-setup"
