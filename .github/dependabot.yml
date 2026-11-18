@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # Keeps .github/workflows/*.yml action versions current (checkout, setup-python,
+  # cache, configure-pages, upload-pages-artifact, deploy-pages, ...).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # The boards/ submodule (rzeldent/platformio-espressif32-sunton) — opens a PR on new
+  # commits, but it's pinned together with esp32_smartdisplay@2.1.1 in platformio.ini
+  # (see that file's comments), so any such PR needs a real-hardware build/flash check
+  # before merging, not an auto-merge.
+  - package-ecosystem: "gitsubmodule"
+    directory: "/"
+    schedule:
+      interval: "weekly"
