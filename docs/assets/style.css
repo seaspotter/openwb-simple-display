@@ -305,6 +305,17 @@ code {
     font-size: 0.875em;
 }
 
+.funding-links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.funding-links img {
+    display: block;
+}
+
 .back-link {
     display: inline-block;
     color: var(--muted);

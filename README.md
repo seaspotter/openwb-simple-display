@@ -113,6 +113,11 @@ tools/        Font-/Icon-Asset-Erzeugung, Release-Paketierung
 docs/         GitHub-Pages-Seite: Startseite, Anleitung, Web-Installer, Release-Manifeste
 ```
 
+## Unterstützung
+
+Macht dir dieses Projekt die Arbeit leichter? Über einen Kaffee freue ich mich:
+[Ko-fi](https://ko-fi.com/seaspotter) · [Buy Me a Coffee](https://buymeacoffee.com/seaspotter)
+
 ## Lizenz
 
 MIT — siehe [`LICENSE`](LICENSE). Mitgelieferte Schriftarten und Icons stehen unter
