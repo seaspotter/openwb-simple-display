@@ -110,6 +110,12 @@ def main():
     install_manifest = {
         "name": "openwb-simple-display",
         "version": args.version,
+        # ESP Web Tools >=10.2 only shows the "erase before install" choice when this is
+        # set — without it, it silently always erases on first install (confirmed by
+        # reading install-dialog's own source: the prompt step is skipped entirely and
+        # _startInstall(true) is called directly). "new_install_skip_erase" is this
+        # option's deprecated old name, still recognized but logged as a warning.
+        "new_install_prompt_erase": True,
         "builds": [
             {
                 "chipFamily": "ESP32-S3",
