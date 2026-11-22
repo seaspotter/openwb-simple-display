@@ -162,20 +162,17 @@
         <span>Speicher-Beladung</span></li>
       <li><img class="icon" src="../assets/icons/icon-bolt-grid.svg" alt="" />
         <span>Netzeinspeisung (Überschuss)</span></li>
+      <li><img class="icon" src="../assets/icons/icon-droplet-consumer.svg" alt="" />
+        <span>Verbraucher (sonstige schaltbare Geräte)</span></li>
       <li><img class="icon" src="../assets/icons/icon-home-muted.svg" alt="" />
-        <span>Hausverbrauch — von openWB berechnet aus allem in der Komponenten-Hierarchie,
-        was (direkt oder per „Automatik"-Vererbung) als Hausverbrauch eingestuft ist</span></li>
+        <span>Hausverbrauch (nicht separat gemessene Grundlast)</span></li>
       <li><img class="icon" src="../assets/icons/icon-gauge-grid.svg" alt="" />
-        <span>Sonstiger Verbrauch — gemessene Verbraucher/Unterzähler in der Hierarchie, die
-        explizit NICHT als Hausverbrauch eingestuft sind (openWBs
-        „nicht im Hausverbrauch enthalten")</span></li>
+        <span>Summe zusätzlicher, automatisch erkannter Unterzähler jenseits des
+        Netz-Hauptzählers (openWBs „Zähler")</span></li>
     </ul>
-    <p><small>Hausverbrauch und Sonstiger Verbrauch zusammen ergeben genau openWBs eigene
-      Aufteilung — ohne Doppelzählung. Ein einzelner Verbraucher oder Unterzähler wird
-      deshalb hier nicht mehr für sich gezeigt: er steckt in einem der beiden Werte, je
-      nachdem wie er in openWB eingestuft ist. Ein Verbraucher, der in openWB gar keiner
-      Hierarchie zugeordnet ist (steht für sich allein), taucht in keinem der beiden Werte
-      auf — das entspricht genau openWBs eigener Hausverbrauchsrechnung.</small></p>
+    <p><small>EVU (Netz) und Zähler sind bewusst nicht zusammengefasst: openWB kann sie
+      intern nicht sauber trennen, deshalb zeigt auch die openWB-Oberfläche selbst sie
+      getrennt an.</small></p>
   </section>
 
   <section class="panel" id="ladepunktkarte">

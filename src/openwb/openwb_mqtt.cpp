@@ -31,22 +31,27 @@ WiFiClient g_plain_client;
 WiFiClientSecure g_secure_client;
 PubSubClient g_mqtt;
 
-// Discovers chargepoints beyond whatever's currently configured via openWB's own counter
-// hierarchy topic — only direct children of the grid root (counter id 1) are considered;
-// on the install this was built against, chargepoints appear there, not nested deeper.
-// (This used to also auto-discover "extra" sub-counters for a separate "Zähler" display
-// segment; that segment was removed because it double-counted against home_consumption_w
-// for any sub-counter whose home-consumption flag resolves to "home consumption", the
-// default — see GlobalStatus::other_consumption_w in openwb_models.h for the real fix.)
+// Auto-discovers any extra sub-meter ("Zähler") beyond the grid root (counter id 0) via
+// openWB's own counter hierarchy topic, instead of requiring the user to configure an
+// id: openWB/simpleAPI/counter/get/power only ever mirrors the root counter (confirmed
+// live), so a true "sum of every counter" needs to walk the tree like openWB's own
+// frontend presumably does. Only direct children of the root are considered — on the
+// install this was built against, extra counters appear there, not nested deeper.
 constexpr char kHierarchyChildPrefix[] = "openWB/simpleAPI/counter/get/hierarchy/1/children/";
 constexpr uint8_t kMaxHierarchyChildren = 16;
+constexpr uint8_t kMaxExtraCounters = 4;
 
 struct HierarchyChildSlot {
     uint8_t id = 0;
     bool id_known = false;
+    bool is_counter = false;
     bool is_chargepoint = false; // ComponentType.CHARGEPOINT.value == "cp" in openWB
 };
 HierarchyChildSlot g_hierarchy_children[kMaxHierarchyChildren];
+
+uint8_t g_extra_counter_ids[kMaxExtraCounters] = {};
+float g_extra_counter_power[kMaxExtraCounters] = {};
+uint8_t g_extra_counter_count = 0;
 
 // Every chargepoint id openWB actually reports via the hierarchy topic, independent of
 // which ones are configured — feeds the web UI's pick-list (see api_routes.cpp), so a
@@ -55,6 +60,25 @@ HierarchyChildSlot g_hierarchy_children[kMaxHierarchyChildren];
 constexpr uint8_t kMaxDiscoveredChargepoints = 8;
 openwb::DiscoveredChargepoint g_discovered_chargepoints[kMaxDiscoveredChargepoints];
 uint8_t g_discovered_chargepoint_count = 0;
+
+void SubscribeExtraCounterPower(uint8_t id) {
+    char topic[48];
+    snprintf(topic, sizeof(topic), "openWB/simpleAPI/counter/%u/get/power", id);
+    g_mqtt.subscribe(topic);
+}
+
+// Adds `id` to the discovered set and subscribes to its power topic, unless already known.
+void EnsureExtraCounterDiscovered(uint8_t id) {
+    for (uint8_t i = 0; i < g_extra_counter_count; ++i) {
+        if (g_extra_counter_ids[i] == id) return;
+    }
+    if (g_extra_counter_count >= kMaxExtraCounters) return;
+    g_extra_counter_ids[g_extra_counter_count] = id;
+    g_extra_counter_power[g_extra_counter_count] = 0;
+    ++g_extra_counter_count;
+    SubscribeExtraCounterPower(id);
+    util::LogInfo(kTag, "discovered an extra counter via the hierarchy topic");
+}
 
 void PublishDiscoveredChargepoints() {
     state::State().SetDiscoveredChargepoints(g_discovered_chargepoints, g_discovered_chargepoint_count);
@@ -97,6 +121,31 @@ bool HandleDiscoveredChargepointName(uint8_t id, const char* name) {
     return false;
 }
 
+void RecomputeExtraCounterTotal() {
+    float total = 0;
+    for (uint8_t i = 0; i < g_extra_counter_count; ++i) total += g_extra_counter_power[i];
+    openwb::GlobalStatus global = state::State().GetGlobalStatus();
+    global.meter_power_w = total;
+    global.valid = true;
+    global.last_update_ms = millis();
+    state::State().SetGlobalStatus(global);
+}
+
+// Handles one discovered extra counter's own get/power update. Returns false if `topic`
+// isn't one of them (the common case for every other global message).
+bool HandleExtraCounterPower(const char* topic, const char* payload) {
+    for (uint8_t i = 0; i < g_extra_counter_count; ++i) {
+        char expected[48];
+        snprintf(expected, sizeof(expected), "openWB/simpleAPI/counter/%u/get/power", g_extra_counter_ids[i]);
+        if (strcmp(topic, expected) == 0) {
+            g_extra_counter_power[i] = static_cast<float>(atof(payload));
+            RecomputeExtraCounterTotal();
+            return true;
+        }
+    }
+    return false;
+}
+
 // Matches "openWB/simpleAPI/counter/get/hierarchy/1/children/<n>/id" or ".../<n>/type".
 // Returns false if `topic` isn't under that prefix at all.
 bool HandleHierarchyChildMessage(const char* topic, const char* payload) {
@@ -115,11 +164,13 @@ bool HandleHierarchyChildMessage(const char* topic, const char* payload) {
         child.id = static_cast<uint8_t>(atoi(payload));
         child.id_known = true;
     } else if (strcmp(field, "type") == 0) {
+        child.is_counter = (strcmp(payload, "counter") == 0);
         child.is_chargepoint = (strcmp(payload, "cp") == 0);
     } else {
         return true; // a deeper field, e.g. children/<n>/children/<m>/id — not tracked
     }
 
+    if (child.id_known && child.is_counter && child.id != 0) EnsureExtraCounterDiscovered(child.id);
     if (child.id_known && child.is_chargepoint && child.id != 0) EnsureChargepointDiscovered(child.id);
     return true;
 }
@@ -235,6 +286,7 @@ void HandleChargeTemplateMessage(uint8_t id, const char* payload) {
 
 void HandleGlobalMessage(const char* topic, const char* payload) {
     if (HandleHierarchyChildMessage(topic, payload)) return;
+    if (HandleExtraCounterPower(topic, payload)) return;
 
     openwb::GlobalStatus global = state::State().GetGlobalStatus();
     if (!ParseGlobalTopic(topic, payload, global)) return;
@@ -281,11 +333,15 @@ void Subscribe() {
     g_mqtt.subscribe("openWB/pv/get/power");
     g_mqtt.subscribe("openWB/bat/get/power");
     g_mqtt.subscribe("openWB/bat/get/soc");
+    g_mqtt.subscribe("openWB/consumer/get/power");
     g_mqtt.subscribe("openWB/simpleAPI/counter/get/power");
     g_mqtt.subscribe("openWB/simpleAPI/counter/set/home_consumption");
-    g_mqtt.subscribe("openWB/simpleAPI/counter/set/not_in_home_consumption");
     g_mqtt.subscribe("openWB/simpleAPI/counter/get/hierarchy/1/children/+/id");
     g_mqtt.subscribe("openWB/simpleAPI/counter/get/hierarchy/1/children/+/type");
+    // Already-discovered extra counters (from a prior connection) need re-subscribing
+    // explicitly on every fresh connect — a new MQTT session has no memory of them, and
+    // they won't be rediscovered until/unless the hierarchy topic happens to republish.
+    for (uint8_t i = 0; i < g_extra_counter_count; ++i) SubscribeExtraCounterPower(g_extra_counter_ids[i]);
 
     for (uint8_t i = 0; i < cfg.chargepoint_count && i < config::AppConfig::kMaxChargepoints; ++i) {
         char topic[48];
