@@ -31,6 +31,7 @@
 #define LV_USE_IMAGE 1
 #define LV_USE_IMAGEBUTTON 1
 #define LV_USE_SWITCH 1
+#define LV_USE_QRCODE 1 // screen_provisioning: WiFi-join QR for the setup AP's password
 
 // Generated project fonts live in src/ui/theme/fonts/ (tools/fonts/generate_fonts.sh) and
 // are declared there with LV_FONT_DECLARE; only the one built-in size actually used as a

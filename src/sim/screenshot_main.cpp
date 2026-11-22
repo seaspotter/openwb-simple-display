@@ -102,7 +102,7 @@ int main() {
     Settle();
     WriteBmp((out_dir + "/01_boot_light.bmp").c_str());
 
-    screens::ShowProvisioningScreen("openwb-simple-display-setup");
+    screens::ShowProvisioningScreen("openwb-simple-display-setup", "12345678");
     Settle();
     WriteBmp((out_dir + "/02_provisioning_light.bmp").c_str());
 

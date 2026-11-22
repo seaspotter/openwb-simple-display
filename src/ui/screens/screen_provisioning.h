@@ -3,6 +3,6 @@
 
 namespace screens {
 
-void ShowProvisioningScreen(const char* ap_ssid);
+void ShowProvisioningScreen(const char* ap_ssid, const char* ap_password);
 
 } // namespace screens

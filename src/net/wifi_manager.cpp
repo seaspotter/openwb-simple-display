@@ -1,5 +1,7 @@
 #include "wifi_manager.h"
 
+#include <cstdio>
+
 #include <WiFiManager.h>
 
 #include "app_config_build.h"
@@ -15,6 +17,10 @@ bool g_params_saved = false;
 void OnSaveParams() { g_params_saved = true; }
 
 } // namespace
+
+void GetApPassword(char* out, size_t out_size) {
+    snprintf(out, out_size, "%08u", static_cast<unsigned>(ESP.getEfuseMac() % 100000000ULL));
+}
 
 void Provision() {
     const config::AppConfig& cfg = config::Store().Get();
@@ -44,7 +50,9 @@ void Provision() {
     wm.setAPCallback([](WiFiManager*) { state::State().SetProvisioningActive(true); });
 
     String ap_ssid = String(cfg.device_name) + AP_SSID_SUFFIX;
-    bool connected = wm.autoConnect(ap_ssid.c_str());
+    char ap_password[9];
+    GetApPassword(ap_password, sizeof(ap_password));
+    bool connected = wm.autoConnect(ap_ssid.c_str(), ap_password);
 
     if (!connected) {
         util::LogError(kTag, "WiFi provisioning timed out without a connection, restarting");

@@ -9,6 +9,7 @@
 #include "board/display_driver.h"
 #include "board/touch_driver.h"
 #include "config/config_store.h"
+#include "net/wifi_manager.h"
 #include "state/app_state.h"
 #include "theme/theme_quartz.h"
 #include "screens/screen_boot.h"
@@ -48,7 +49,9 @@ void ApplyScreenTransition(ScreenMode* mode) {
     if (*mode == ScreenMode::kBoot && state::State().IsProvisioningActive()) {
         *mode = ScreenMode::kProvisioning;
         String ap_ssid = String(config::Store().Get().device_name) + AP_SSID_SUFFIX;
-        screens::ShowProvisioningScreen(ap_ssid.c_str());
+        char ap_password[9];
+        net::GetApPassword(ap_password, sizeof(ap_password));
+        screens::ShowProvisioningScreen(ap_ssid.c_str(), ap_password);
     }
 }
 
