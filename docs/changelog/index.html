@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Changelog — openWB Simple Display</title>
+<meta name="description" content="Alle Versionen des openWB Simple Display mit den jeweiligen Änderungen." />
+<link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+<main>
+  <a class="back-link" href="../">&larr; Zur Startseite</a>
+  <h1>Changelog</h1>
+  <p class="subtitle">
+    Alle Versionen in umgekehrter Reihenfolge — neueste zuerst. Die aktuell installierte
+    Version steht in den Geräteeinstellungen bzw. der Weboberfläche.
+  </p>
+
+  <section class="panel" id="v0-1-9">
+    <h2>0.1.9</h2>
+    <ul>
+      <li>Ladepunkte werden jetzt automatisch im Netzwerk erkannt — keine manuelle
+        Eingabe von Ladepunkt-IDs mehr nötig (freie Eingabe bleibt als Fallback möglich).</li>
+      <li>Der openWB-MQTT-Broker wird beim Einrichten automatisch im Netzwerk gesucht,
+        statt die IP-Adresse von Hand eingeben zu müssen.</li>
+      <li>Der WLAN-Einrichtungs-Access-Point ist jetzt passwortgeschützt und zeigt einen
+        QR-Code zum schnellen Verbinden direkt auf dem Display.</li>
+      <li>Nach mehreren falschen PIN-Eingaben sperrt die Weboberfläche den Zugriff für
+        einige Minuten.</li>
+      <li><strong>Fix:</strong> Die Anzeigen „Verbraucher" und „Zähler" im
+        Energiefluss-Diagramm zählten ihre Leistung teils doppelt mit dem Hausverbrauch
+        mit. Sie zeigen jetzt nur noch den Anteil, der laut openWB wirklich nicht zum
+        Hausverbrauch zählt.</li>
+    </ul>
+  </section>
+
+  <section class="panel" id="v0-1-8">
+    <h2>0.1.8</h2>
+    <ul>
+      <li>Klarstellung in Anzeige und Anleitung: Eine manuelle Update-Prüfung am Display
+        installiert niemals automatisch — die Installation läuft immer über die
+        Weboberfläche.</li>
+    </ul>
+  </section>
+
+  <section class="panel" id="v0-1-7">
+    <h2>0.1.7</h2>
+    <ul>
+      <li><strong>Fix:</strong> Firmware-Updates aktualisierten nie die Weboberfläche
+        selbst, nur die Firmware — dafür war einmalig ein Update per USB nötig, danach
+        funktioniert es über die Luft.</li>
+      <li><strong>Fix:</strong> Die Fortschrittsanzeige eines Updates in der
+        Weboberfläche blieb manchmal bei 98&nbsp;% hängen.</li>
+    </ul>
+  </section>
+
+  <section class="panel" id="v0-1-6">
+    <h2>0.1.6</h2>
+    <ul>
+      <li>Die Update-Installation läuft jetzt nur noch über die Weboberfläche; am
+        Display lässt sich weiterhin auf ein Update prüfen.</li>
+      <li>Neu: automatische Installation gefundener Updates als Option (vorher nur
+        Hinweis, manuelle Installation).</li>
+      <li><strong>Fix:</strong> abgeschnittenes „Phasen"-Label auf der Ladepunkt-Karte.</li>
+      <li>Diverse kleinere Fehlerbehebungen.</li>
+    </ul>
+  </section>
+
+  <section class="panel" id="v0-1-5">
+    <h2>0.1.5</h2>
+    <ul>
+      <li><strong>Fix:</strong> Fehler beim PIN-Schutz und einem wiederkehrenden
+        Hinweis-Dialog behoben.</li>
+    </ul>
+  </section>
+
+  <section class="panel" id="v0-1-4">
+    <h2>0.1.4</h2>
+    <ul>
+      <li><strong>Fix:</strong> Die Update-Installation wurde fälschlich blockiert, wenn
+        kein Ladevorgang lief, und schlug in manchen Fällen still fehl, ohne
+        Fehlermeldung.</li>
+    </ul>
+  </section>
+
+  <section class="panel" id="v0-1-3">
+    <h2>0.1.3</h2>
+    <ul>
+      <li>Bessere Anzeige, wenn für einen Ladepunkt (noch) keine Daten ankommen.</li>
+      <li>Verbesserter Login der Weboberfläche.</li>
+      <li>Neu: PIN-Schutz direkt am Display.</li>
+    </ul>
+  </section>
+
+  <section class="panel" id="v0-1-2">
+    <h2>0.1.2</h2>
+    <ul>
+      <li><strong>Fix:</strong> Der Browser-Installer löschte immer den gesamten
+        Gerätespeicher, ohne das zur Auswahl zu stellen.</li>
+    </ul>
+  </section>
+
+  <section class="panel" id="v0-1-1">
+    <h2>0.1.1</h2>
+    <ul>
+      <li>Diverse Korrekturen am Layout dieser Webseite (Inhaltsverzeichnis,
+        Install-Button).</li>
+    </ul>
+  </section>
+
+  <section class="panel" id="v0-1-0">
+    <h2>0.1.0</h2>
+    <ul>
+      <li>Erste Veröffentlichung.</li>
+    </ul>
+  </section>
+
+  <p class="disclaimer">
+    Dies ist kein offizielles Produkt der openWB GmbH &amp; Co. KG. Der Autor arbeitet
+    jedoch eng mit dem openWB-Team zusammen und entwickelt auch darüber hinaus Software
+    für das Projekt.
+  </p>
+</main>
+</body>
+</html>

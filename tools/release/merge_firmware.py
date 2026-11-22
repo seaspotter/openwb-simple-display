@@ -157,10 +157,14 @@ def main():
         print("WARNING: --allow-unsigned set — manifest has no signature; "
               "no device will accept this as an OTA update", file=sys.stderr)
 
+    # One shared changelog page (docs/changelog/), not a page per release — each version
+    # is a section there with id "v" + the version with dots replaced by dashes (e.g.
+    # "0.1.9" -> "v0-1-9"), kept in sync by hand when docs/changelog/index.html is edited.
+    changelog_anchor = "v" + args.version.replace(".", "-")
     ota_manifest = {
         "latest_version": args.version,
         "min_supported_version": args.min_supported_version,
-        "release_notes_url": f"{args.base_url}/releases/{args.version}.html",
+        "release_notes_url": f"{args.base_url}/changelog/#{changelog_anchor}",
         "firmware": firmware_field,
         "filesystem": filesystem_field,
     }
