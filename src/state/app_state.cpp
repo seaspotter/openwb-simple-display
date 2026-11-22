@@ -126,6 +126,22 @@ bool AppState::TryTakePendingBrightnessSave(uint32_t now_ms, uint32_t debounce_m
     return ready;
 }
 
+void AppState::SetDiscoveredChargepoints(const openwb::DiscoveredChargepoint* list, uint8_t count) {
+    if (count > kMaxDiscoveredChargepoints) count = kMaxDiscoveredChargepoints;
+    LOCK(&lock_);
+    for (uint8_t i = 0; i < count; ++i) discovered_chargepoints_[i] = list[i];
+    discovered_chargepoint_count_ = count;
+    UNLOCK(&lock_);
+}
+
+uint8_t AppState::GetDiscoveredChargepoints(openwb::DiscoveredChargepoint* out, uint8_t max_count) const {
+    LOCK(&lock_);
+    uint8_t count = discovered_chargepoint_count_ < max_count ? discovered_chargepoint_count_ : max_count;
+    for (uint8_t i = 0; i < count; ++i) out[i] = discovered_chargepoints_[i];
+    UNLOCK(&lock_);
+    return count;
+}
+
 bool AppState::AnyChargepointCharging() const {
     LOCK(&lock_);
     bool any = false;

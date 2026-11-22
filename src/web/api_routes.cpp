@@ -57,6 +57,21 @@ void WriteChargepointJson(JsonObject obj, const openwb::ChargepointStatus& cp) {
     obj["last_update_ms"] = cp.last_update_ms;
 }
 
+void HandleGetDiscoveredChargepoints(AsyncWebServerRequest* request) {
+    if (!CheckAuth(request)) return;
+    openwb::DiscoveredChargepoint discovered[state::AppState::kMaxDiscoveredChargepoints];
+    uint8_t count = state::State().GetDiscoveredChargepoints(discovered, state::AppState::kMaxDiscoveredChargepoints);
+
+    JsonDocument doc;
+    JsonArray arr = doc["chargepoints"].to<JsonArray>();
+    for (uint8_t i = 0; i < count; ++i) {
+        JsonObject obj = arr.add<JsonObject>();
+        obj["id"] = discovered[i].id;
+        obj["name"] = discovered[i].name;
+    }
+    SendJson(request, doc);
+}
+
 void HandleGetStatus(AsyncWebServerRequest* request) {
     if (!CheckAuth(request)) return;
     const config::AppConfig& cfg = config::Store().Get();
@@ -277,6 +292,7 @@ void HandleOtaProgress(AsyncWebServerRequest* request) {
 
 void RegisterApiRoutes(AsyncWebServer& server) {
     server.on("/api/status", HTTP_GET, HandleGetStatus);
+    server.on("/api/chargepoints/discovered", HTTP_GET, HandleGetDiscoveredChargepoints);
     server.on("/api/config", HTTP_GET, HandleGetConfig);
     server.on("/api/info", HTTP_GET, HandleGetInfo);
     server.on("/api/ota/check", HTTP_POST, HandleOtaCheck);

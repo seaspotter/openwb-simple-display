@@ -100,7 +100,12 @@
           <option value="false">Unverschlüsselt (Port 1883)</option>
           <option value="true">TLS (Port 8883)</option>
         </select>
-        <label for="chargepoint_ids">Ladepunkt-IDs (kommagetrennt, bis zu 4)</label>
+        <label>Ladepunkte (bis zu 4 ankreuzen)</label>
+        <div id="discovered-chargepoints-list">Suche läuft…</div>
+        <p><small>Erscheint hier nichts (noch) keine Verbindung zu openWB, oder der
+          Ladepunkt wurde seit dem letzten Neustart von openWB noch nicht gemeldet)?
+          Unten die ID manuell eintragen.</small></p>
+        <label for="chargepoint_ids">Ladepunkt-IDs manuell (kommagetrennt, bis zu 4)</label>
         <input id="chargepoint_ids" placeholder="z. B. 1, 3" />
       </section>
 

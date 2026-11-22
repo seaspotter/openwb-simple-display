@@ -199,6 +199,33 @@ a {
     font-size: 0.875rem;
 }
 
+#discovered-chargepoints-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.chargepoint-pick {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    font-size: 0.875rem;
+}
+
+.chargepoint-pick input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+}
+
+.chargepoint-pick .cp-id {
+    color: var(--muted);
+    font-size: 0.75rem;
+}
+
 button {
     appearance: none;
     border: none;

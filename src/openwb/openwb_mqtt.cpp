@@ -45,12 +45,21 @@ struct HierarchyChildSlot {
     uint8_t id = 0;
     bool id_known = false;
     bool is_counter = false;
+    bool is_chargepoint = false; // ComponentType.CHARGEPOINT.value == "cp" in openWB
 };
 HierarchyChildSlot g_hierarchy_children[kMaxHierarchyChildren];
 
 uint8_t g_extra_counter_ids[kMaxExtraCounters] = {};
 float g_extra_counter_power[kMaxExtraCounters] = {};
 uint8_t g_extra_counter_count = 0;
+
+// Every chargepoint id openWB actually reports via the hierarchy topic, independent of
+// which ones are configured — feeds the web UI's pick-list (see api_routes.cpp), so a
+// stale/typo'd id can be caught before it's ever saved instead of silently showing no
+// data (the exact bug this was built to prevent).
+constexpr uint8_t kMaxDiscoveredChargepoints = 8;
+openwb::DiscoveredChargepoint g_discovered_chargepoints[kMaxDiscoveredChargepoints];
+uint8_t g_discovered_chargepoint_count = 0;
 
 void SubscribeExtraCounterPower(uint8_t id) {
     char topic[48];
@@ -69,6 +78,47 @@ void EnsureExtraCounterDiscovered(uint8_t id) {
     ++g_extra_counter_count;
     SubscribeExtraCounterPower(id);
     util::LogInfo(kTag, "discovered an extra counter via the hierarchy topic");
+}
+
+void PublishDiscoveredChargepoints() {
+    state::State().SetDiscoveredChargepoints(g_discovered_chargepoints, g_discovered_chargepoint_count);
+}
+
+void SubscribeChargepointName(uint8_t id) {
+    char topic[64];
+    snprintf(topic, sizeof(topic), "openWB/simpleAPI/chargepoint/%u/config/name", id);
+    g_mqtt.subscribe(topic);
+}
+
+// Adds `id` to the discovered set, unless already known. Already-configured chargepoints
+// are already subscribed to their full `#` wildcard (see Subscribe()), which includes
+// config/name — subscribing again here is a harmless duplicate. For a discovered-but-
+// not-configured one, this is the only topic fetched for it, keeping discovery cheap.
+void EnsureChargepointDiscovered(uint8_t id) {
+    for (uint8_t i = 0; i < g_discovered_chargepoint_count; ++i) {
+        if (g_discovered_chargepoints[i].id == id) return;
+    }
+    if (g_discovered_chargepoint_count >= kMaxDiscoveredChargepoints) return;
+    g_discovered_chargepoints[g_discovered_chargepoint_count].id = id;
+    g_discovered_chargepoints[g_discovered_chargepoint_count].name[0] = '\0';
+    ++g_discovered_chargepoint_count;
+    SubscribeChargepointName(id);
+    PublishDiscoveredChargepoints();
+    util::LogInfo(kTag, "discovered a chargepoint via the hierarchy topic");
+}
+
+// Records a discovered (not necessarily configured) chargepoint's name. Returns false if
+// `id` isn't a known discovered chargepoint — the common case being one that IS
+// configured, where the name instead flows through HandleChargepointMessage as normal.
+bool HandleDiscoveredChargepointName(uint8_t id, const char* name) {
+    for (uint8_t i = 0; i < g_discovered_chargepoint_count; ++i) {
+        if (g_discovered_chargepoints[i].id == id) {
+            strlcpy(g_discovered_chargepoints[i].name, name, sizeof(g_discovered_chargepoints[i].name));
+            PublishDiscoveredChargepoints();
+            return true;
+        }
+    }
+    return false;
 }
 
 void RecomputeExtraCounterTotal() {
@@ -115,11 +165,13 @@ bool HandleHierarchyChildMessage(const char* topic, const char* payload) {
         child.id_known = true;
     } else if (strcmp(field, "type") == 0) {
         child.is_counter = (strcmp(payload, "counter") == 0);
+        child.is_chargepoint = (strcmp(payload, "cp") == 0);
     } else {
         return true; // a deeper field, e.g. children/<n>/children/<m>/id — not tracked
     }
 
     if (child.id_known && child.is_counter && child.id != 0) EnsureExtraCounterDiscovered(child.id);
+    if (child.id_known && child.is_chargepoint && child.id != 0) EnsureChargepointDiscovered(child.id);
     return true;
 }
 
@@ -133,6 +185,11 @@ int SlotForChargepointId(uint8_t id) {
 }
 
 void HandleChargepointMessage(uint8_t id, const char* suffix, const char* payload) {
+    // Kept in sync regardless of whether `id` is currently configured — a chargepoint
+    // the user already enabled is just as real a discovery-list entry as one they
+    // haven't, so the web UI's pick-list can show a name for either.
+    if (strcmp(suffix, "config/name") == 0) HandleDiscoveredChargepointName(id, payload);
+
     int slot = SlotForChargepointId(id);
     if (slot < 0) return;
 

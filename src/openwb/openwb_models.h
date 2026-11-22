@@ -48,6 +48,16 @@ struct ChargepointStatus {
     uint32_t last_update_ms = 0;
 };
 
+// A chargepoint openWB actually knows about, found via its component hierarchy topic
+// (openwb_mqtt.cpp) — independent of what's currently configured in AppConfig, so the
+// web UI can offer a real pick-list instead of free-text IDs that might not exist (the
+// exact bug this was added to prevent: a typo'd/stale ID showing no data with no
+// indication why).
+struct DiscoveredChargepoint {
+    uint8_t id = 0;
+    char name[48] = ""; // empty until its config/name topic is actually received
+};
+
 struct GlobalStatus {
     bool valid = false;
 

@@ -64,6 +64,15 @@ public:
     void SetPendingBrightnessSave(uint8_t percent, uint32_t now_ms);
     bool TryTakePendingBrightnessSave(uint32_t now_ms, uint32_t debounce_ms, uint8_t* out_percent);
 
+    static constexpr uint8_t kMaxDiscoveredChargepoints = 8;
+
+    // Replaces the whole discovered-chargepoint list each call — openwb_mqtt.cpp keeps
+    // its own working copy and pushes a full snapshot here, same pattern as
+    // ChargepointStatus/GlobalStatus, rather than mutating this shared copy piecemeal.
+    void SetDiscoveredChargepoints(const openwb::DiscoveredChargepoint* list, uint8_t count);
+    // Copies up to min(count, max_count) entries into `out`; returns how many were copied.
+    uint8_t GetDiscoveredChargepoints(openwb::DiscoveredChargepoint* out, uint8_t max_count) const;
+
 private:
 #ifdef UNIT_TEST
     mutable PortMux lock_ = 0;
@@ -82,6 +91,9 @@ private:
     bool brightness_save_pending_ = false;
     uint8_t pending_brightness_percent_ = 0;
     uint32_t pending_brightness_set_ms_ = 0;
+
+    openwb::DiscoveredChargepoint discovered_chargepoints_[kMaxDiscoveredChargepoints]{};
+    uint8_t discovered_chargepoint_count_ = 0;
 };
 
 // Process-wide instance, shared by the net task and the UI task.

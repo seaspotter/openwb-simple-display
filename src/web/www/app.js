@@ -58,6 +58,7 @@ async function loadConfig() {
   );
   updateScheduleFieldsVisibility();
   document.getElementById("pin-status").textContent = cfg.has_web_ui_pin ? "Aktiv" : "Deaktiviert";
+  loadDiscoveredChargepoints();
 }
 
 function toTimeInput(hour, minute) {
@@ -72,6 +73,57 @@ function updateScheduleFieldsVisibility() {
 function updateOtaAutoInstallVisibility() {
   const checking = document.getElementById("ota_auto_check").value === "true";
   document.getElementById("ota-auto-install-field").style.display = checking ? "block" : "none";
+}
+
+const kMaxChargepoints = 4; // matches AppConfig::kMaxChargepoints
+
+// Keeps the checkbox list in sync with chargepoint_ids' *current* value rather than
+// overwriting it from scratch each poll — otherwise a box the user just (un)checked
+// would flicker back to its pre-click state on the next 5s refresh, before their own
+// change actually reaches Speichern & Neustart.
+function currentChargepointIds() {
+  return document
+    .getElementById("chargepoint_ids")
+    .value.split(",")
+    .map((s) => parseInt(s.trim(), 10))
+    .filter((n) => !isNaN(n));
+}
+
+function onChargepointCheckboxChanged(event) {
+  const checked = Array.from(document.querySelectorAll(".chargepoint-pick input:checked")).map((el) =>
+    parseInt(el.value, 10)
+  );
+  if (checked.length > kMaxChargepoints) {
+    showToast(`Maximal ${kMaxChargepoints} Ladepunkte gleichzeitig.`);
+    // Revert: uncheck whichever box just pushed the count over the limit.
+    event.target.checked = false;
+    return;
+  }
+  document.getElementById("chargepoint_ids").value = checked.join(", ");
+}
+
+async function loadDiscoveredChargepoints() {
+  const res = await fetch("/api/chargepoints/discovered");
+  const data = await res.json();
+  const list = document.getElementById("discovered-chargepoints-list");
+  const discovered = data.chargepoints || [];
+
+  if (discovered.length === 0) {
+    list.textContent = "Noch keine Ladepunkte erkannt — siehe Hinweis unten.";
+    return;
+  }
+
+  const selected = new Set(currentChargepointIds());
+  list.innerHTML = discovered
+    .map((cp) => {
+      const checked = selected.has(cp.id) ? "checked" : "";
+      const name = cp.name ? escapeHtml(cp.name) : "(Name noch nicht empfangen)";
+      return `<label class="chargepoint-pick">
+        <input type="checkbox" value="${cp.id}" ${checked} onchange="onChargepointCheckboxChanged(event)" />
+        ${name} <span class="cp-id">ID ${cp.id}</span>
+      </label>`;
+    })
+    .join("");
 }
 
 async function loadStatus() {
@@ -130,7 +182,7 @@ function readSettingsForm() {
     .value.split(",")
     .map((s) => parseInt(s.trim(), 10))
     .filter((n) => !isNaN(n))
-    .slice(0, 4);
+    .slice(0, kMaxChargepoints);
 
   const body = {
     ota_auto_check: document.getElementById("ota_auto_check").value === "true",
@@ -321,3 +373,4 @@ loadConfig();
 loadStatus();
 loadInfo();
 setInterval(loadStatus, 5000);
+setInterval(loadDiscoveredChargepoints, 5000);
