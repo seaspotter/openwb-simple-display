@@ -65,11 +65,19 @@ struct GlobalStatus {
     float grid_power_w = 0;
     float battery_power_w = 0;
     float battery_soc_percent = -1;   // -1 = no battery configured
-    float consumer_power_w = 0;       // "Verbraucher" (other switchable consumer devices)
-    float home_consumption_w = 0;     // "Hausverbrauch" (unmeasured household base load)
-    float meter_power_w = 0;          // "Zähler" — sum of any extra sub-meters beyond the
-                                       // grid root, auto-discovered via openWB's own
-                                       // counter hierarchy topic (see openwb_mqtt.cpp)
+    float home_consumption_w = 0;     // "Hausverbrauch" — openWB's own calculated total of
+                                       // everything in the component hierarchy flagged (or
+                                       // inherited) as home consumption: see
+                                       // counter_all.py::_calc_home_consumption_from_counter.
+    float other_consumption_w = 0;    // "Sonstiger Verbrauch" — openWB's `not_in_home_consumption`
+                                       // aggregate: the complement of home_consumption_w (measured
+                                       // consumers/sub-counters in the hierarchy explicitly flagged
+                                       // OUT of home consumption). Deliberately NOT the raw
+                                       // `consumer/get/power` sum or a sub-counter's raw power —
+                                       // both of those overlap with home_consumption_w for any
+                                       // component whose flag resolves (directly or via "auto"
+                                       // inheritance, the default) to home consumption, which would
+                                       // double-count it against this card's own aggregate.
 
     uint32_t last_update_ms = 0;
 };

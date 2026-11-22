@@ -130,9 +130,8 @@ void HandleGetStatus(AsyncWebServerRequest* request) {
     g["grid_power_w"] = global.grid_power_w;
     g["battery_power_w"] = global.battery_power_w;
     g["battery_soc_percent"] = global.battery_soc_percent;
-    g["consumer_power_w"] = global.consumer_power_w;
     g["home_consumption_w"] = global.home_consumption_w;
-    g["meter_power_w"] = global.meter_power_w;
+    g["other_consumption_w"] = global.other_consumption_w;
 
     SendJson(request, doc);
 }

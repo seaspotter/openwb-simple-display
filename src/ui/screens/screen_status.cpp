@@ -24,8 +24,8 @@ constexpr uint32_t kRefreshIntervalMs = 500;
 // Max pool of legend/bar slots each bar can show; how many are actually visible each
 // tick depends on how many categories are currently non-zero (see FilterNonZero).
 constexpr uint8_t kSupplySlots = 3; // PV, grid import, battery discharge
-constexpr uint8_t kDemandSlots = 6; // chargepoints, battery charge, grid export,
-                                     // Verbraucher, Hausverbrauch, Zähler
+constexpr uint8_t kDemandSlots = 5; // chargepoints, battery charge, grid export,
+                                     // Hausverbrauch, Sonstiger Verbrauch
 
 std::vector<lv_obj_t*> g_chargepoint_cards;
 // Re-created every time ShowStatusScreen runs (initial boot transition, plus every
@@ -278,9 +278,8 @@ void RefreshTick(lv_timer_t* /*timer*/) {
             {icon::Glyph::kBolt, colors.chargepoint, chargepoints_total_w},
             {icon::Glyph::kBattery, colors.battery, battery_charging_w},
             {icon::Glyph::kBolt, colors.grid, grid_export_w},
-            {icon::Glyph::kDroplet, colors.consumer, global.consumer_power_w},
             {icon::Glyph::kHome, colors.muted, global.home_consumption_w},
-            {icon::Glyph::kGauge, colors.grid, global.meter_power_w},
+            {icon::Glyph::kGauge, colors.consumer, global.other_consumption_w},
         };
         FlowItem demand_active[kDemandSlots];
         uint8_t demand_count = FilterNonZero(demand_candidates, kDemandSlots, demand_active);
