@@ -39,7 +39,11 @@ bool CheckAuth(AsyncWebServerRequest* request) {
     if (cfg.web_ui_pin[0] == '\0') return true;
 
     uint32_t now = millis();
-    if (g_auth_lockout_until_ms != 0 && now < g_auth_lockout_until_ms) {
+    // Signed-subtraction comparison, not now < g_auth_lockout_until_ms: millis() wraps
+    // every ~49.7 days, and a plain < comparison breaks right at that wraparound (the
+    // lockout deadline, computed just before the wrap, reads as already in the past to
+    // a `now` that hasn't wrapped yet) — this form stays correct across the wrap.
+    if (g_auth_lockout_until_ms != 0 && static_cast<int32_t>(g_auth_lockout_until_ms - now) > 0) {
         request->send(429, "application/json",
                       "{\"error\":\"Zu viele Fehlversuche — bitte in ein paar Minuten erneut versuchen\"}");
         return false;
@@ -253,6 +257,7 @@ void HandleMqttDiscoverProgress(AsyncWebServerRequest* request) {
     JsonDocument doc;
     doc["running"] = net::IsBrokerDiscoveryRunning();
     doc["progress_percent"] = net::BrokerDiscoveryProgressPercent();
+    doc["error"] = net::BrokerDiscoveryError();
     JsonArray found = doc["brokers"].to<JsonArray>();
     uint8_t count = net::DiscoveredBrokerCount();
     for (uint8_t i = 0; i < count; ++i) {

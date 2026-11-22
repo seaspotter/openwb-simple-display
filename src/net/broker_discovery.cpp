@@ -18,10 +18,20 @@ constexpr uint32_t kVerifyTimeoutMs = 1000;   // wait for the retained version t
 constexpr int32_t kTcpProbeTimeoutMs = 200;   // per-host connect attempt during the scan
 constexpr uint8_t kMaxScanAddresses = 254;    // a /24's usable host range
 
+// Guards g_discovered[]/g_discovered_count only — these are written by the discovery
+// task (AddDiscovered) and read from a different task by the web server's progress
+// poll (GetDiscoveredBroker/DiscoveredBrokerCount); without a lock, a reader could see
+// the incremented count before the host string write beside it is visible, returning a
+// truncated/garbled IP. g_running/g_progress_percent/g_error are each a single
+// primitive written by one side and read by the other, so a plain `volatile` is
+// enough for those — no multi-field consistency to protect.
+portMUX_TYPE g_discovered_lock = portMUX_INITIALIZER_UNLOCKED;
 DiscoveredBroker g_discovered[kMaxDiscoveredBrokers];
 uint8_t g_discovered_count = 0;
 volatile bool g_running = false;
 volatile int g_progress_percent = -1;
+char g_error[48] = ""; // only ever written before g_running becomes true, or by the
+                        // task itself before g_running becomes false — never concurrently
 
 // PubSubClient's callback is a plain function pointer (no user-data parameter in this
 // version), so a result can't be captured by a lambda — a single static flag is fine
@@ -32,6 +42,8 @@ void OnVerifyMessage(char* /*topic*/, uint8_t* /*payload*/, unsigned int /*lengt
     g_verify_got_version = true;
 }
 
+// Only ever called from the discovery task itself (never concurrently with another
+// call to this), so no lock needed here — only against the cross-task readers below.
 bool AlreadyFound(IPAddress ip) {
     char ip_str[16];
     snprintf(ip_str, sizeof(ip_str), "%s", ip.toString().c_str());
@@ -43,10 +55,12 @@ bool AlreadyFound(IPAddress ip) {
 
 void AddDiscovered(IPAddress ip, uint16_t port) {
     if (g_discovered_count >= kMaxDiscoveredBrokers || AlreadyFound(ip)) return;
+    portENTER_CRITICAL(&g_discovered_lock);
     snprintf(g_discovered[g_discovered_count].host, sizeof(g_discovered[g_discovered_count].host), "%s",
               ip.toString().c_str());
     g_discovered[g_discovered_count].port = port;
     ++g_discovered_count;
+    portEXIT_CRITICAL(&g_discovered_lock);
     util::LogInfo(kTag, "verified an openWB broker");
 }
 
@@ -115,6 +129,19 @@ void ScanLocalSubnet() {
 void DiscoveryTaskBody(void* /*param*/) {
     g_discovered_count = 0;
     g_progress_percent = 0;
+    g_error[0] = '\0';
+
+    // Without this, a scan attempted while WiFi is down (e.g. mid-reconnect) silently
+    // finds nothing via either path and gets reported to the web UI identically to a
+    // real "searched the whole network, nothing there" result — hiding the actual
+    // reason from the user.
+    if (WiFi.status() != WL_CONNECTED) {
+        strlcpy(g_error, "WLAN nicht verbunden", sizeof(g_error));
+        g_progress_percent = -1;
+        g_running = false;
+        vTaskDelete(nullptr);
+        return;
+    }
 
     ScanViaMdns();
     // The subnet scan is the slow part (seconds to tens of seconds) — skipped entirely
@@ -139,11 +166,20 @@ bool IsBrokerDiscoveryRunning() { return g_running; }
 
 int BrokerDiscoveryProgressPercent() { return g_progress_percent; }
 
-uint8_t DiscoveredBrokerCount() { return g_discovered_count; }
+uint8_t DiscoveredBrokerCount() {
+    portENTER_CRITICAL(&g_discovered_lock);
+    uint8_t count = g_discovered_count;
+    portEXIT_CRITICAL(&g_discovered_lock);
+    return count;
+}
 
 DiscoveredBroker GetDiscoveredBroker(uint8_t index) {
-    if (index >= g_discovered_count) return DiscoveredBroker{};
-    return g_discovered[index];
+    portENTER_CRITICAL(&g_discovered_lock);
+    DiscoveredBroker result = (index < g_discovered_count) ? g_discovered[index] : DiscoveredBroker{};
+    portEXIT_CRITICAL(&g_discovered_lock);
+    return result;
 }
+
+const char* BrokerDiscoveryError() { return g_error; }
 
 } // namespace net

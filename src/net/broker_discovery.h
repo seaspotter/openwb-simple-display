@@ -32,4 +32,8 @@ int BrokerDiscoveryProgressPercent();
 uint8_t DiscoveredBrokerCount();
 DiscoveredBroker GetDiscoveredBroker(uint8_t index);
 
+// Non-empty if the most recent scan couldn't even attempt a meaningful search (e.g.
+// WiFi not connected) — distinguishes "didn't look" from "looked and found nothing".
+const char* BrokerDiscoveryError();
+
 } // namespace net
