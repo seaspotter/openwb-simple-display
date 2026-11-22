@@ -102,6 +102,68 @@ function onChargepointCheckboxChanged(event) {
   document.getElementById("chargepoint_ids").value = checked.join(", ");
 }
 
+let brokerDiscoveryPollTimer = null;
+
+function stopBrokerDiscoveryPoll() {
+  if (brokerDiscoveryPollTimer !== null) {
+    clearInterval(brokerDiscoveryPollTimer);
+    brokerDiscoveryPollTimer = null;
+  }
+}
+
+function renderBrokerResults(brokers) {
+  const status = document.getElementById("broker-discovery-status");
+  if (brokers.length === 0) {
+    status.textContent = "Keine openWB-Installation gefunden — bitte Host/IP unten manuell eintragen.";
+    return;
+  }
+  status.innerHTML = brokers
+    .map(
+      (b) =>
+        `<button type="button" class="secondary broker-pick" data-host="${escapeHtml(b.host)}" data-port="${b.port}">${escapeHtml(b.host)}:${b.port} verwenden</button>`
+    )
+    .join(" ");
+  status.querySelectorAll(".broker-pick").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.getElementById("mqtt_host").value = btn.dataset.host;
+      document.getElementById("mqtt_port").value = btn.dataset.port;
+      showToast(`Host übernommen: ${btn.dataset.host}`);
+    });
+  });
+}
+
+// Same AbortController pattern as the OTA progress poll (see startOtaPoll) — without a
+// timeout, a request can sit far longer than expected before rejecting on its own.
+async function pollBrokerDiscovery() {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3000);
+  try {
+    const res = await fetch("/api/mqtt/discover/progress", { signal: controller.signal });
+    const data = await res.json();
+    const status = document.getElementById("broker-discovery-status");
+    if (data.running) {
+      const pct = data.progress_percent >= 0 ? ` ${data.progress_percent} %` : "";
+      status.textContent = `Suche läuft…${pct}`;
+    } else {
+      stopBrokerDiscoveryPoll();
+      renderBrokerResults(data.brokers || []);
+    }
+  } catch {
+    stopBrokerDiscoveryPoll();
+    document.getElementById("broker-discovery-status").textContent =
+      "Verbindung zum Display unterbrochen — Suche ggf. erneut starten.";
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function discoverBroker() {
+  document.getElementById("broker-discovery-status").textContent = "Suche gestartet…";
+  await fetch("/api/mqtt/discover", { method: "POST" });
+  stopBrokerDiscoveryPoll();
+  brokerDiscoveryPollTimer = setInterval(pollBrokerDiscovery, 1000);
+}
+
 async function loadDiscoveredChargepoints() {
   const res = await fetch("/api/chargepoints/discovered");
   const data = await res.json();
@@ -367,6 +429,7 @@ document.getElementById("reset-wifi-btn").addEventListener("click", resetWifi);
 document.getElementById("set-pin-btn").addEventListener("click", setWebUiPin);
 document.getElementById("dark_mode_schedule").addEventListener("change", updateScheduleFieldsVisibility);
 document.getElementById("ota_auto_check").addEventListener("change", updateOtaAutoInstallVisibility);
+document.getElementById("discover-broker-btn").addEventListener("click", discoverBroker);
 
 initWebUiTheme();
 loadConfig();

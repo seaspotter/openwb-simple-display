@@ -91,7 +91,11 @@
       <li><strong>Die IP-Adresse (oder der Hostname) des openWB-MQTT-Brokers</strong> —
         im selben Assistenten einzutragen, meist einfach die IP der openWB-Box selbst.
         Port, Benutzername und Passwort können i.&nbsp;d.&nbsp;R. leer bleiben
-        (Standardinstallation: Port 1883, anonymer Zugriff).</li>
+        (Standardinstallation: Port 1883, anonymer Zugriff). Noch nicht zur Hand? Dieses
+        Feld auch leer lassen und nach dem ersten Neustart stattdessen in der
+        Weboberfläche auf „openWB im Netzwerk suchen" tippen — die Suche kann erst
+        laufen, sobald das Display im eigenen WLAN ist, deshalb geht das während dieses
+        allerersten Assistenten noch nicht.</li>
       <li><strong>Die Ladepunkte auswählen</strong> — die Weboberfläche erkennt die in
         der eigenen openWB-Installation vorhandenen Ladepunkte automatisch (per Name)
         und zeigt sie zum Ankreuzen an (bis zu 4); eine manuelle ID-Eingabe bleibt als
@@ -360,7 +364,11 @@
     <h3>MQTT-Broker (openWB)</h3>
     <p>Host/IP, Port, optional Benutzername/Passwort und TLS, sowie die
       Ladepunkt-ID(s) — die einzigen wirklich notwendigen Angaben, siehe
-      <a href="#einrichtung">Ersteinrichtung</a>.</p>
+      <a href="#einrichtung">Ersteinrichtung</a>. „openWB im Netzwerk suchen" sucht die
+      eigene openWB-Installation automatisch (per mDNS, sonst per Netzwerk-Scan im
+      eigenen Subnetz) und bestätigt jeden Fund per echter MQTT-Verbindung, statt nur zu
+      prüfen, ob irgendetwas auf Port 1883 antwortet — kann je nach Netzwerkgröße einige
+      Sekunden bis gut eine halbe Minute dauern.</p>
     <h3>Display</h3>
     <p>Helligkeit, Bildschirm-Timeout (Sekunden Inaktivität bis zum Abdunkeln, 0 = nie),
       Energiefluss-Diagramm ein-/ausblenden, Darstellung (Hell/Dunkel) sowie der

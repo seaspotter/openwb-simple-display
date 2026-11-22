@@ -11,6 +11,7 @@
 #include "app_config_build.h"
 #include "board/display_driver.h"
 #include "config/config_store.h"
+#include "net/broker_discovery.h"
 #include "net/wifi_manager.h"
 #include "ota/ota_manager.h"
 #include "state/app_state.h"
@@ -241,6 +242,28 @@ bool HandleSetWebUiPin(AsyncWebServerRequest* request, JsonVariant& json) {
     return true;
 }
 
+void HandleMqttDiscoverStart(AsyncWebServerRequest* request) {
+    if (!CheckAuth(request)) return;
+    net::StartBrokerDiscovery();
+    request->send(200, "application/json", "{\"started\":true}");
+}
+
+void HandleMqttDiscoverProgress(AsyncWebServerRequest* request) {
+    if (!CheckAuth(request)) return;
+    JsonDocument doc;
+    doc["running"] = net::IsBrokerDiscoveryRunning();
+    doc["progress_percent"] = net::BrokerDiscoveryProgressPercent();
+    JsonArray found = doc["brokers"].to<JsonArray>();
+    uint8_t count = net::DiscoveredBrokerCount();
+    for (uint8_t i = 0; i < count; ++i) {
+        net::DiscoveredBroker broker = net::GetDiscoveredBroker(i);
+        JsonObject obj = found.add<JsonObject>();
+        obj["host"] = broker.host;
+        obj["port"] = broker.port;
+    }
+    SendJson(request, doc);
+}
+
 void HandleWifiReset(AsyncWebServerRequest* request) {
     if (!CheckAuth(request)) return;
     // Must respond before ResetAndReprovision(), which reboots the device.
@@ -334,6 +357,8 @@ void RegisterApiRoutes(AsyncWebServer& server) {
     server.on("/api/ota/check", HTTP_POST, HandleOtaCheck);
     server.on("/api/ota/start", HTTP_POST, HandleOtaStart);
     server.on("/api/ota/progress", HTTP_GET, HandleOtaProgress);
+    server.on("/api/mqtt/discover", HTTP_POST, HandleMqttDiscoverStart);
+    server.on("/api/mqtt/discover/progress", HTTP_GET, HandleMqttDiscoverProgress);
     server.on("/api/wifi/reset", HTTP_POST, HandleWifiReset);
     server.on("/api/config/reset", HTTP_POST, HandleResetSettings);
     server.on("/api/restart", HTTP_POST, HandleRestart);
