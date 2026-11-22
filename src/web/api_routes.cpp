@@ -14,17 +14,53 @@
 #include "net/wifi_manager.h"
 #include "ota/ota_manager.h"
 #include "state/app_state.h"
+#include "util/logging.h"
 
 namespace web {
 namespace {
 
 constexpr const char* kMasked = "********";
+constexpr char kTag[] = "api_routes";
+
+// Global, not per-IP: this device has one legitimate user at a time, so the simplicity
+// of a single shared counter outweighs tracking individual source addresses. Not a
+// hardened enterprise control, just enough to turn "guess PINs all day over WiFi" into
+// a real cost instead of a free, instant, unlimited loop.
+constexpr uint8_t kMaxFailedAuthAttempts = 5;
+constexpr uint32_t kAuthLockoutMs = 5 * 60 * 1000;
+
+uint8_t g_failed_auth_attempts = 0;
+uint32_t g_auth_lockout_until_ms = 0;
 
 // HTTP Basic Auth gate; disabled while AppConfig::web_ui_pin is empty.
 bool CheckAuth(AsyncWebServerRequest* request) {
     const config::AppConfig& cfg = config::Store().Get();
     if (cfg.web_ui_pin[0] == '\0') return true;
-    if (request->authenticate("user", cfg.web_ui_pin)) return true;
+
+    uint32_t now = millis();
+    if (g_auth_lockout_until_ms != 0 && now < g_auth_lockout_until_ms) {
+        request->send(429, "application/json",
+                      "{\"error\":\"Zu viele Fehlversuche — bitte in ein paar Minuten erneut versuchen\"}");
+        return false;
+    }
+
+    if (request->authenticate("user", cfg.web_ui_pin)) {
+        g_failed_auth_attempts = 0;
+        g_auth_lockout_until_ms = 0;
+        return true;
+    }
+
+    // A browser's very first request to a protected endpoint has no Authorization
+    // header at all yet (it hasn't been prompted for credentials), which would
+    // otherwise count as a "failed attempt" on every single page load.
+    if (request->hasHeader("Authorization")) {
+        ++g_failed_auth_attempts;
+        if (g_failed_auth_attempts >= kMaxFailedAuthAttempts) {
+            g_auth_lockout_until_ms = now + kAuthLockoutMs;
+            util::LogWarn(kTag, "too many failed web UI logins, locking out");
+        }
+    }
+
     // requestAuthentication()'s default is Digest auth, not Basic (despite its name) —
     // force Basic explicitly, matching what authenticate() checks above and what the
     // comment on this function always intended.
