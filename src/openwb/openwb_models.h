@@ -65,11 +65,16 @@ struct GlobalStatus {
     float grid_power_w = 0;
     float battery_power_w = 0;
     float battery_soc_percent = -1;   // -1 = no battery configured
+    // "Verbraucher"/"Zähler": sum of direct children of the grid root (counter id 1,
+    // auto-discovered via openWB's own counter hierarchy topic, see openwb_mqtt.cpp) whose
+    // home-consumption flag — their own explicit config/is_home_consumption_{consumer,
+    // counter} value, or the grid root's own effective flag when theirs is "auto" — resolves
+    // to NOT home consumption. A child resolving TO home consumption is already counted
+    // inside home_consumption_w (openWB's own calculation includes it there), so it's
+    // deliberately excluded here to avoid double-counting it against that total.
     float consumer_power_w = 0;       // "Verbraucher" (other switchable consumer devices)
     float home_consumption_w = 0;     // "Hausverbrauch" (unmeasured household base load)
-    float meter_power_w = 0;          // "Zähler" — sum of any extra sub-meters beyond the
-                                       // grid root, auto-discovered via openWB's own
-                                       // counter hierarchy topic (see openwb_mqtt.cpp)
+    float meter_power_w = 0;          // "Zähler" (extra sub-meters beyond the grid root)
 
     uint32_t last_update_ms = 0;
 };

@@ -4,8 +4,11 @@
 
 using openwb::ChargepointStatus;
 using openwb::GlobalStatus;
+using openwb::mqtt::ExcludedFromHomeConsumption;
+using openwb::mqtt::HcFlag;
 using openwb::mqtt::ParseChargepointField;
 using openwb::mqtt::ParseGlobalTopic;
+using openwb::mqtt::ParseHcFlag;
 using openwb::mqtt::ParseLogPayload;
 
 void setUp() {}
@@ -104,6 +107,34 @@ void test_unrecognized_global_topic_returns_false() {
     TEST_ASSERT_FALSE(ParseGlobalTopic("openWB/some/other/topic", "1", global));
 }
 
+void test_parse_hc_flag_recognizes_all_three_openwb_values() {
+    TEST_ASSERT_TRUE(ParseHcFlag("home_consumption") == HcFlag::kHome);
+    TEST_ASSERT_TRUE(ParseHcFlag("no_home_consumption") == HcFlag::kNotHome);
+    TEST_ASSERT_TRUE(ParseHcFlag("auto_home_consumption") == HcFlag::kAuto);
+    TEST_ASSERT_TRUE(ParseHcFlag("garbage") == HcFlag::kAuto);
+}
+
+// A child explicitly flagged NOT home consumption is excluded regardless of the root.
+void test_explicit_not_home_consumption_is_always_excluded() {
+    TEST_ASSERT_TRUE(ExcludedFromHomeConsumption(HcFlag::kNotHome, HcFlag::kHome));
+    TEST_ASSERT_TRUE(ExcludedFromHomeConsumption(HcFlag::kNotHome, HcFlag::kNotHome));
+}
+
+// A child explicitly flagged AS home consumption is never excluded, regardless of root —
+// this is the case that was double-counted against home_consumption_w before this fix.
+void test_explicit_home_consumption_is_never_excluded() {
+    TEST_ASSERT_FALSE(ExcludedFromHomeConsumption(HcFlag::kHome, HcFlag::kHome));
+    TEST_ASSERT_FALSE(ExcludedFromHomeConsumption(HcFlag::kHome, HcFlag::kNotHome));
+}
+
+// "auto" inherits the root's effective flag; the root's own "auto" defaults to home
+// consumption (openWB hardcodes this — there's no grandparent to inherit from).
+void test_auto_flag_inherits_the_roots_effective_flag() {
+    TEST_ASSERT_FALSE(ExcludedFromHomeConsumption(HcFlag::kAuto, HcFlag::kHome));
+    TEST_ASSERT_TRUE(ExcludedFromHomeConsumption(HcFlag::kAuto, HcFlag::kNotHome));
+    TEST_ASSERT_FALSE(ExcludedFromHomeConsumption(HcFlag::kAuto, HcFlag::kAuto)); // root's own auto -> home
+}
+
 int main(int /*argc*/, char** /*argv*/) {
     UNITY_BEGIN();
     RUN_TEST(test_power_field_parses_as_float);
@@ -119,5 +150,9 @@ int main(int /*argc*/, char** /*argv*/) {
     RUN_TEST(test_pv_power_is_negated_from_the_raw_topic_sign);
     RUN_TEST(test_grid_power_reads_the_simpleapi_mirror_topic);
     RUN_TEST(test_unrecognized_global_topic_returns_false);
+    RUN_TEST(test_parse_hc_flag_recognizes_all_three_openwb_values);
+    RUN_TEST(test_explicit_not_home_consumption_is_always_excluded);
+    RUN_TEST(test_explicit_home_consumption_is_never_excluded);
+    RUN_TEST(test_auto_flag_inherits_the_roots_effective_flag);
     return UNITY_END();
 }

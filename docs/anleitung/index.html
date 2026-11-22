@@ -163,16 +163,21 @@
       <li><img class="icon" src="../assets/icons/icon-bolt-grid.svg" alt="" />
         <span>Netzeinspeisung (Überschuss)</span></li>
       <li><img class="icon" src="../assets/icons/icon-droplet-consumer.svg" alt="" />
-        <span>Verbraucher (sonstige schaltbare Geräte)</span></li>
+        <span>Verbraucher — automatisch erkannte, schaltbare Geräte direkt unter dem
+        Netz-Hauptzähler, aber nur deren Anteil, der in openWB NICHT als Hausverbrauch
+        eingestuft ist</span></li>
       <li><img class="icon" src="../assets/icons/icon-home-muted.svg" alt="" />
-        <span>Hausverbrauch (nicht separat gemessene Grundlast)</span></li>
+        <span>Hausverbrauch — von openWB berechnet aus allem, was (direkt oder per
+        „Automatik"-Vererbung) als Hausverbrauch eingestuft ist</span></li>
       <li><img class="icon" src="../assets/icons/icon-gauge-grid.svg" alt="" />
-        <span>Summe zusätzlicher, automatisch erkannter Unterzähler jenseits des
-        Netz-Hauptzählers (openWBs „Zähler")</span></li>
+        <span>Zähler — automatisch erkannte Unterzähler jenseits des Netz-Hauptzählers,
+        aber nur deren Anteil, der NICHT als Hausverbrauch eingestuft ist</span></li>
     </ul>
-    <p><small>EVU (Netz) und Zähler sind bewusst nicht zusammengefasst: openWB kann sie
-      intern nicht sauber trennen, deshalb zeigt auch die openWB-Oberfläche selbst sie
-      getrennt an.</small></p>
+    <p><small>Verbraucher/Zähler und Hausverbrauch überschneiden sich dadurch nie: ein
+      Gerät oder Unterzähler, das openWB (direkt oder per Vererbung vom Hauptzähler) als
+      Hausverbrauch einstuft, zählt ausschließlich im Hausverbrauch-Wert, nicht zusätzlich
+      hier. Nur explizit als „kein Hausverbrauch" eingestufte Geräte/Zähler erscheinen in
+      diesen beiden Werten.</small></p>
   </section>
 
   <section class="panel" id="ladepunktkarte">

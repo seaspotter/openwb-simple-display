@@ -31,27 +31,57 @@ WiFiClient g_plain_client;
 WiFiClientSecure g_secure_client;
 PubSubClient g_mqtt;
 
-// Auto-discovers any extra sub-meter ("Zähler") beyond the grid root (counter id 0) via
-// openWB's own counter hierarchy topic, instead of requiring the user to configure an
-// id: openWB/simpleAPI/counter/get/power only ever mirrors the root counter (confirmed
-// live), so a true "sum of every counter" needs to walk the tree like openWB's own
-// frontend presumably does. Only direct children of the root are considered — on the
-// install this was built against, extra counters appear there, not nested deeper.
+// Auto-discovers any extra sub-counter ("Zähler") or consumer ("Verbraucher") beyond the
+// grid root (counter id 1) via openWB's own counter hierarchy topic, instead of requiring
+// the user to configure an id. Only direct children of the root are considered — on the
+// install this was built against, these appear there, not nested deeper; a child with
+// further children of its own (so that this project would need to subtract THEIR power
+// out too, the way openWB's own "local_power" does server-side) isn't handled — a known
+// gap, not attempted here given the added complexity of walking an arbitrarily deep tree
+// on-device for a case not seen in practice.
+//
+// Each discovered child's power is only ever added to Verbraucher/Zähler if its effective
+// home-consumption flag resolves to NOT home consumption — confirmed by reading openWB's
+// own calculation (control/counter_all/counter_all.py::_calc_home_consumption_from_counter)
+// and its web frontend's independent re-derivation of the same thing
+// (web_themes/koala/source/src/stores/mqtt-store.ts::homeConsumptionAssignment): a child
+// flagged (explicitly, or via "auto" inheriting its parent's — here, the grid root's —
+// effective flag, the default) AS home consumption is already included inside
+// home_consumption_w by openWB itself, so adding it again here would double-count it.
 constexpr char kHierarchyChildPrefix[] = "openWB/simpleAPI/counter/get/hierarchy/1/children/";
 constexpr uint8_t kMaxHierarchyChildren = 16;
 constexpr uint8_t kMaxExtraCounters = 4;
+constexpr uint8_t kMaxExtraConsumers = 4;
+constexpr uint8_t kRootCounterId = 1;
 
 struct HierarchyChildSlot {
     uint8_t id = 0;
     bool id_known = false;
     bool is_counter = false;
+    bool is_consumer = false;    // ComponentType.CONSUMER.value == "consumer" in openWB
     bool is_chargepoint = false; // ComponentType.CHARGEPOINT.value == "cp" in openWB
 };
 HierarchyChildSlot g_hierarchy_children[kMaxHierarchyChildren];
 
-uint8_t g_extra_counter_ids[kMaxExtraCounters] = {};
-float g_extra_counter_power[kMaxExtraCounters] = {};
+// The grid root's own flag — needed to resolve any child's "auto" value (see
+// ExcludedFromHomeConsumption in openwb_mqtt_topics.h).
+HcFlag g_root_flag = HcFlag::kAuto;
+
+// Shared shape for both discovered-extra-counter and discovered-extra-consumer tracking —
+// kept as one type (rather than two identical structs) specifically so the subscribe/
+// match logic below can be one parameterized set of functions instead of two near-
+// identical copies that could silently drift apart (exactly how an earlier draft of this
+// fix ended up with a buffer-size bug on only the consumer side).
+struct ExtraComponent {
+    uint8_t id = 0;
+    float power = 0;
+    HcFlag flag = HcFlag::kAuto;
+};
+ExtraComponent g_extra_counters[kMaxExtraCounters];
 uint8_t g_extra_counter_count = 0;
+
+ExtraComponent g_extra_consumers[kMaxExtraConsumers];
+uint8_t g_extra_consumer_count = 0;
 
 // Every chargepoint id openWB actually reports via the hierarchy topic, independent of
 // which ones are configured — feeds the web UI's pick-list (see api_routes.cpp), so a
@@ -61,23 +91,54 @@ constexpr uint8_t kMaxDiscoveredChargepoints = 8;
 openwb::DiscoveredChargepoint g_discovered_chargepoints[kMaxDiscoveredChargepoints];
 uint8_t g_discovered_chargepoint_count = 0;
 
-void SubscribeExtraCounterPower(uint8_t id) {
-    char topic[48];
-    snprintf(topic, sizeof(topic), "openWB/simpleAPI/counter/%u/get/power", id);
+// `component` is "counter" or "consumer", `flag_field` the matching
+// is_home_consumption_{counter,consumer} config key — see ExtraComponent's comment for why
+// this is one parameterized function instead of two copies. Sized for the longest real
+// topic this builds: "openWB/simpleAPI/consumer/255/config/is_home_consumption_consumer"
+// is 65 chars + NUL; a tighter buffer previously truncated it for 2+ digit ids, silently
+// subscribing to a topic the broker never publishes.
+//
+// Raw openWB never gives is_home_consumption_consumer its own topic (it's one key in the
+// consumer's whole config JSON blob) — but simpleAPI's generic mirror expands any JSON
+// object value into per-key sub-topics, so it IS individually addressable here even though
+// it isn't on the raw, non-simpleAPI broker (confirmed by reading simpleAPI_mqtt.py's
+// `_expand_value_to_topics` and consumer_data.py's `ConsumerConfig`, which carries no
+// per-field topic metadata of its own, unlike the counter equivalent).
+void SubscribeExtraComponent(const char* component, const char* flag_field, uint8_t id) {
+    char topic[80];
+    snprintf(topic, sizeof(topic), "openWB/simpleAPI/%s/%u/get/power", component, id);
+    g_mqtt.subscribe(topic);
+    snprintf(topic, sizeof(topic), "openWB/simpleAPI/%s/%u/config/%s", component, id, flag_field);
     g_mqtt.subscribe(topic);
 }
 
-// Adds `id` to the discovered set and subscribes to its power topic, unless already known.
+void SubscribeExtraCounter(uint8_t id) { SubscribeExtraComponent("counter", "is_home_consumption_counter", id); }
+void SubscribeExtraConsumer(uint8_t id) { SubscribeExtraComponent("consumer", "is_home_consumption_consumer", id); }
+
+// Adds `id` to the discovered set and subscribes to its power + home-consumption-flag
+// topics, unless already known.
 void EnsureExtraCounterDiscovered(uint8_t id) {
     for (uint8_t i = 0; i < g_extra_counter_count; ++i) {
-        if (g_extra_counter_ids[i] == id) return;
+        if (g_extra_counters[i].id == id) return;
     }
     if (g_extra_counter_count >= kMaxExtraCounters) return;
-    g_extra_counter_ids[g_extra_counter_count] = id;
-    g_extra_counter_power[g_extra_counter_count] = 0;
+    g_extra_counters[g_extra_counter_count] = ExtraComponent{id, 0, HcFlag::kAuto};
     ++g_extra_counter_count;
-    SubscribeExtraCounterPower(id);
+    SubscribeExtraCounter(id);
     util::LogInfo(kTag, "discovered an extra counter via the hierarchy topic");
+}
+
+// Adds `id` to the discovered set and subscribes to its power + home-consumption-flag
+// topics, unless already known.
+void EnsureExtraConsumerDiscovered(uint8_t id) {
+    for (uint8_t i = 0; i < g_extra_consumer_count; ++i) {
+        if (g_extra_consumers[i].id == id) return;
+    }
+    if (g_extra_consumer_count >= kMaxExtraConsumers) return;
+    g_extra_consumers[g_extra_consumer_count] = ExtraComponent{id, 0, HcFlag::kAuto};
+    ++g_extra_consumer_count;
+    SubscribeExtraConsumer(id);
+    util::LogInfo(kTag, "discovered an extra consumer via the hierarchy topic");
 }
 
 void PublishDiscoveredChargepoints() {
@@ -123,7 +184,9 @@ bool HandleDiscoveredChargepointName(uint8_t id, const char* name) {
 
 void RecomputeExtraCounterTotal() {
     float total = 0;
-    for (uint8_t i = 0; i < g_extra_counter_count; ++i) total += g_extra_counter_power[i];
+    for (uint8_t i = 0; i < g_extra_counter_count; ++i) {
+        if (ExcludedFromHomeConsumption(g_extra_counters[i].flag, g_root_flag)) total += g_extra_counters[i].power;
+    }
     openwb::GlobalStatus global = state::State().GetGlobalStatus();
     global.meter_power_w = total;
     global.valid = true;
@@ -131,19 +194,64 @@ void RecomputeExtraCounterTotal() {
     state::State().SetGlobalStatus(global);
 }
 
-// Handles one discovered extra counter's own get/power update. Returns false if `topic`
-// isn't one of them (the common case for every other global message).
-bool HandleExtraCounterPower(const char* topic, const char* payload) {
-    for (uint8_t i = 0; i < g_extra_counter_count; ++i) {
-        char expected[48];
-        snprintf(expected, sizeof(expected), "openWB/simpleAPI/counter/%u/get/power", g_extra_counter_ids[i]);
+void RecomputeExtraConsumerTotal() {
+    float total = 0;
+    for (uint8_t i = 0; i < g_extra_consumer_count; ++i) {
+        if (ExcludedFromHomeConsumption(g_extra_consumers[i].flag, g_root_flag)) total += g_extra_consumers[i].power;
+    }
+    openwb::GlobalStatus global = state::State().GetGlobalStatus();
+    global.consumer_power_w = total;
+    global.valid = true;
+    global.last_update_ms = millis();
+    state::State().SetGlobalStatus(global);
+}
+
+// Matches one discovered extra counter's/consumer's own get/power or home-consumption-flag
+// update against `items[0..count)` and updates it in place. Returns false if `topic` isn't
+// one of them (the common case for every other global message) — see
+// SubscribeExtraComponent for why `component`/`flag_field` are parameters rather than two
+// copies of this function.
+bool HandleExtraComponentMessage(const char* component, const char* flag_field, ExtraComponent* items, uint8_t count,
+                                   void (*recompute)(), const char* topic, const char* payload) {
+    for (uint8_t i = 0; i < count; ++i) {
+        char expected[80];
+        snprintf(expected, sizeof(expected), "openWB/simpleAPI/%s/%u/get/power", component, items[i].id);
         if (strcmp(topic, expected) == 0) {
-            g_extra_counter_power[i] = static_cast<float>(atof(payload));
-            RecomputeExtraCounterTotal();
+            items[i].power = static_cast<float>(atof(payload));
+            recompute();
+            return true;
+        }
+        snprintf(expected, sizeof(expected), "openWB/simpleAPI/%s/%u/config/%s", component, items[i].id, flag_field);
+        if (strcmp(topic, expected) == 0) {
+            items[i].flag = ParseHcFlag(payload);
+            recompute();
             return true;
         }
     }
     return false;
+}
+
+bool HandleExtraCounterMessage(const char* topic, const char* payload) {
+    return HandleExtraComponentMessage("counter", "is_home_consumption_counter", g_extra_counters,
+                                        g_extra_counter_count, RecomputeExtraCounterTotal, topic, payload);
+}
+
+bool HandleExtraConsumerMessage(const char* topic, const char* payload) {
+    return HandleExtraComponentMessage("consumer", "is_home_consumption_consumer", g_extra_consumers,
+                                        g_extra_consumer_count, RecomputeExtraConsumerTotal, topic, payload);
+}
+
+// The grid root's own flag affects every discovered child whose own flag is "auto" — a
+// change here can flip which children count as excluded, so both totals get recomputed.
+bool HandleRootCounterFlag(const char* topic, const char* payload) {
+    char expected[64];
+    snprintf(expected, sizeof(expected), "openWB/simpleAPI/counter/%u/config/is_home_consumption_counter",
+              kRootCounterId);
+    if (strcmp(topic, expected) != 0) return false;
+    g_root_flag = ParseHcFlag(payload);
+    RecomputeExtraCounterTotal();
+    RecomputeExtraConsumerTotal();
+    return true;
 }
 
 // Matches "openWB/simpleAPI/counter/get/hierarchy/1/children/<n>/id" or ".../<n>/type".
@@ -165,12 +273,14 @@ bool HandleHierarchyChildMessage(const char* topic, const char* payload) {
         child.id_known = true;
     } else if (strcmp(field, "type") == 0) {
         child.is_counter = (strcmp(payload, "counter") == 0);
+        child.is_consumer = (strcmp(payload, "consumer") == 0);
         child.is_chargepoint = (strcmp(payload, "cp") == 0);
     } else {
         return true; // a deeper field, e.g. children/<n>/children/<m>/id — not tracked
     }
 
     if (child.id_known && child.is_counter && child.id != 0) EnsureExtraCounterDiscovered(child.id);
+    if (child.id_known && child.is_consumer && child.id != 0) EnsureExtraConsumerDiscovered(child.id);
     if (child.id_known && child.is_chargepoint && child.id != 0) EnsureChargepointDiscovered(child.id);
     return true;
 }
@@ -286,7 +396,9 @@ void HandleChargeTemplateMessage(uint8_t id, const char* payload) {
 
 void HandleGlobalMessage(const char* topic, const char* payload) {
     if (HandleHierarchyChildMessage(topic, payload)) return;
-    if (HandleExtraCounterPower(topic, payload)) return;
+    if (HandleRootCounterFlag(topic, payload)) return;
+    if (HandleExtraCounterMessage(topic, payload)) return;
+    if (HandleExtraConsumerMessage(topic, payload)) return;
 
     openwb::GlobalStatus global = state::State().GetGlobalStatus();
     if (!ParseGlobalTopic(topic, payload, global)) return;
@@ -333,15 +445,19 @@ void Subscribe() {
     g_mqtt.subscribe("openWB/pv/get/power");
     g_mqtt.subscribe("openWB/bat/get/power");
     g_mqtt.subscribe("openWB/bat/get/soc");
-    g_mqtt.subscribe("openWB/consumer/get/power");
     g_mqtt.subscribe("openWB/simpleAPI/counter/get/power");
     g_mqtt.subscribe("openWB/simpleAPI/counter/set/home_consumption");
+    char root_flag_topic[64];
+    snprintf(root_flag_topic, sizeof(root_flag_topic),
+              "openWB/simpleAPI/counter/%u/config/is_home_consumption_counter", kRootCounterId);
+    g_mqtt.subscribe(root_flag_topic);
     g_mqtt.subscribe("openWB/simpleAPI/counter/get/hierarchy/1/children/+/id");
     g_mqtt.subscribe("openWB/simpleAPI/counter/get/hierarchy/1/children/+/type");
-    // Already-discovered extra counters (from a prior connection) need re-subscribing
-    // explicitly on every fresh connect — a new MQTT session has no memory of them, and
-    // they won't be rediscovered until/unless the hierarchy topic happens to republish.
-    for (uint8_t i = 0; i < g_extra_counter_count; ++i) SubscribeExtraCounterPower(g_extra_counter_ids[i]);
+    // Already-discovered extra counters/consumers (from a prior connection) need
+    // re-subscribing explicitly on every fresh connect — a new MQTT session has no memory
+    // of them, and they won't be rediscovered until/unless the hierarchy topic republishes.
+    for (uint8_t i = 0; i < g_extra_counter_count; ++i) SubscribeExtraCounter(g_extra_counters[i].id);
+    for (uint8_t i = 0; i < g_extra_consumer_count; ++i) SubscribeExtraConsumer(g_extra_consumers[i].id);
 
     for (uint8_t i = 0; i < cfg.chargepoint_count && i < config::AppConfig::kMaxChargepoints; ++i) {
         char topic[48];

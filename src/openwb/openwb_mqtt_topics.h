@@ -20,6 +20,30 @@ inline bool ParseBool(const char* payload) {
     return strcmp(payload, "True") == 0 || strcmp(payload, "true") == 0 || strcmp(payload, "1") == 0;
 }
 
+// openWB's CounterMode enum (control/counter.py), as published in
+// config/is_home_consumption_{counter,consumer} — confirmed against that source directly.
+// "auto_home_consumption" inherits the parent's effective flag; for a direct child of the
+// grid root (the only depth this project resolves — see openwb_mqtt.cpp), that parent is
+// always the root itself.
+enum class HcFlag : uint8_t { kAuto, kHome, kNotHome };
+
+inline HcFlag ParseHcFlag(const char* payload) {
+    if (strcmp(payload, "home_consumption") == 0) return HcFlag::kHome;
+    if (strcmp(payload, "no_home_consumption") == 0) return HcFlag::kNotHome;
+    return HcFlag::kAuto; // "auto_home_consumption", or not yet received
+}
+
+// Resolves a child's own flag against the grid root's effective flag (root_flag's own
+// "auto" hardcodes to home consumption, matching openWB's own calculation — there's no
+// grandparent for the root to inherit from) and reports whether the result is NOT home
+// consumption — i.e. whether this child's power belongs in Verbraucher/Zähler rather than
+// already being counted inside openWB's own home_consumption total.
+inline bool ExcludedFromHomeConsumption(HcFlag own_flag, HcFlag root_flag) {
+    bool root_is_home_consumption = root_flag != HcFlag::kNotHome;
+    if (own_flag == HcFlag::kAuto) return !root_is_home_consumption;
+    return own_flag == HcFlag::kNotHome;
+}
+
 // Parses one field of `openWB/simpleAPI/chargepoint/<id>/<suffix>`. Returns false for
 // an unrecognized suffix (expected — the caller subscribes with a wildcard).
 inline bool ParseChargepointField(const char* suffix, const char* payload, ChargepointStatus& out) {
@@ -92,8 +116,6 @@ inline bool ParseGlobalTopic(const char* topic, const char* payload, GlobalStatu
         out.battery_power_w = static_cast<float>(atof(payload));
     } else if (strcmp(topic, "openWB/bat/get/soc") == 0) {
         out.battery_soc_percent = static_cast<float>(atof(payload));
-    } else if (strcmp(topic, "openWB/consumer/get/power") == 0) {
-        out.consumer_power_w = static_cast<float>(atof(payload));
     } else if (strcmp(topic, "openWB/simpleAPI/counter/set/home_consumption") == 0) {
         out.home_consumption_w = static_cast<float>(atof(payload));
     } else if (strcmp(topic, "openWB/simpleAPI/counter/get/power") == 0) {
