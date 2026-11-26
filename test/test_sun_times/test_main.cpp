@@ -49,6 +49,14 @@ void test_time_range_basic_boundaries() {
     TEST_ASSERT_TRUE(IsDarkByTimeRange(6, 59, 22, 0, 7, 0));   // just before light_start: dark
 }
 
+// Equal start/end is a degenerate zero-width "light" window, not a zero-width "dark"
+// one — always dark, at any time of day, rather than silently never dark.
+void test_equal_start_and_end_is_always_dark() {
+    TEST_ASSERT_TRUE(IsDarkByTimeRange(0, 0, 22, 0, 22, 0));
+    TEST_ASSERT_TRUE(IsDarkByTimeRange(12, 0, 22, 0, 22, 0));
+    TEST_ASSERT_TRUE(IsDarkByTimeRange(22, 0, 22, 0, 22, 0));
+}
+
 void test_sunrise_sunset_midday_is_light_and_midnight_is_dark() {
     constexpr double kLat = 51.1657;
     constexpr double kLon = 10.4515;
@@ -64,6 +72,7 @@ int main(int /*argc*/, char** /*argv*/) {
     RUN_TEST(test_winter_solstice_sunrise_and_sunset_are_in_plausible_range);
     RUN_TEST(test_summer_day_is_longer_than_winter_day);
     RUN_TEST(test_time_range_basic_boundaries);
+    RUN_TEST(test_equal_start_and_end_is_always_dark);
     RUN_TEST(test_sunrise_sunset_midday_is_light_and_midnight_is_dark);
     return UNITY_END();
 }

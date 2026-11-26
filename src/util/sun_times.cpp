@@ -84,6 +84,13 @@ bool IsDarkByTimeRange(int current_hour, int current_minute, uint8_t dark_start_
     int dark_start = dark_start_hour * 60 + dark_start_min;
     int light_start = light_start_hour * 60 + light_start_min;
 
+    // Equal start/end is a zero-width "light" window, not a zero-width "dark" one — the
+    // non-wrap branch below (`current >= dark_start && current < light_start`) would
+    // otherwise be unsatisfiable for any current time, silently making a schedule that
+    // looks like "always dark" (e.g. set up to test the feature, or a copy/paste typo)
+    // never actually activate.
+    if (dark_start == light_start) return true;
+
     if (dark_start > light_start) {
         // The usual case: dark runs from evening across midnight into morning.
         return current >= dark_start || current < light_start;

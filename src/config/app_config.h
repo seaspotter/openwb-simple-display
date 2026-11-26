@@ -12,7 +12,7 @@ namespace config {
 // Load() reads the overlapping byte prefix regardless, so a field add/remove still
 // requires fields to only ever be appended at the end of this struct, never reordered
 // or resized, or older devices' saved bytes would land in the wrong field on upgrade.
-inline constexpr uint8_t kCurrentSchemaVersion = 5; // v5: added ota_auto_install
+inline constexpr uint8_t kCurrentSchemaVersion = 6; // v6: added the sleep_schedule_* fields
 
 enum class DarkModeSchedule : uint8_t {
     kManual = 0,       // "Darstellung" dropdown is the only thing that sets dark_mode
@@ -67,6 +67,20 @@ struct AppConfig {
     // gate as a manual install (ota_gate.cpp) — never installs while a chargepoint is
     // charging or the display was touched recently.
     bool ota_auto_install = false;
+
+    // Backlight-off during a daily time window (e.g. overnight) — independent of, and
+    // doesn't replace, screen_timeout_s's inactivity-based dimming above: both apply at
+    // once (see ui/lvgl_port.cpp's ApplyScreenTimeout), so an inactivity timeout still
+    // works during the day even if a sleep schedule is also configured, and vice versa.
+    // A touch always wakes the backlight immediately, same as screen_timeout_s; within
+    // the schedule window it goes back off again after a short fixed grace period
+    // instead of waiting for screen_timeout_s, which may be 0 ("never") and would
+    // otherwise defeat the whole point of a night schedule.
+    bool sleep_schedule_enabled = false;
+    uint8_t sleep_start_hour = 22;
+    uint8_t sleep_start_min = 0;
+    uint8_t wake_start_hour = 6;
+    uint8_t wake_start_min = 0;
 };
 
 } // namespace config

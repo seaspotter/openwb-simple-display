@@ -56,6 +56,10 @@ async function loadConfig() {
   document.getElementById("chargepoint_ids").value = (cfg.chargepoint_ids || []).join(", ");
   document.getElementById("brightness_pct").value = cfg.brightness_pct;
   document.getElementById("screen_timeout_s").value = cfg.screen_timeout_s;
+  document.getElementById("sleep_schedule_enabled").value = String(cfg.sleep_schedule_enabled);
+  document.getElementById("sleep_start").value = toTimeInput(cfg.sleep_start_hour, cfg.sleep_start_min);
+  document.getElementById("wake_start").value = toTimeInput(cfg.wake_start_hour, cfg.wake_start_min);
+  updateSleepScheduleFieldsVisibility();
   document.getElementById("show_flow_chart").value = String(cfg.show_flow_chart);
   document.getElementById("dark_mode").value = String(cfg.dark_mode);
   document.getElementById("dark_mode_schedule").value = String(cfg.dark_mode_schedule);
@@ -76,14 +80,24 @@ function toTimeInput(hour, minute) {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
+// Shows targetId exactly when selectId's current value equals showValue (as a string,
+// since <select> values are always strings) — the shared shape behind every "pick a
+// mode, reveal the fields that mode needs" toggle on this page.
+function toggleFieldVisibility(selectId, targetId, showValue) {
+  const shown = document.getElementById(selectId).value === showValue;
+  document.getElementById(targetId).style.display = shown ? "block" : "none";
+}
+
 function updateScheduleFieldsVisibility() {
-  const mode = document.getElementById("dark_mode_schedule").value;
-  document.getElementById("schedule-time-fields").style.display = mode === "1" ? "block" : "none";
+  toggleFieldVisibility("dark_mode_schedule", "schedule-time-fields", "1");
+}
+
+function updateSleepScheduleFieldsVisibility() {
+  toggleFieldVisibility("sleep_schedule_enabled", "sleep-schedule-time-fields", "true");
 }
 
 function updateOtaAutoInstallVisibility() {
-  const checking = document.getElementById("ota_auto_check").value === "true";
-  document.getElementById("ota-auto-install-field").style.display = checking ? "block" : "none";
+  toggleFieldVisibility("ota_auto_check", "ota-auto-install-field", "true");
 }
 
 const kMaxChargepoints = 4; // matches AppConfig::kMaxChargepoints
@@ -247,9 +261,15 @@ async function loadInfo() {
   document.getElementById("fw-version").textContent = info.firmware_version;
 }
 
+// A cleared <input type="time"> has value "" — "".split(":").map(Number) is [NaN], which
+// JSON.stringify would turn into a bare `null` for the hour key and drop the minute key
+// entirely; the server's `is<int>()` check then silently skips both, leaving the old
+// value in place despite the page reporting a successful save. Falling back to 0:00
+// instead sends a well-formed, visibly-wrong value the person can actually notice and
+// correct, rather than an edit that silently didn't take.
 function parseTimeInput(elementId, hourKey, minKey) {
   const [hour, minute] = document.getElementById(elementId).value.split(":").map(Number);
-  return { [hourKey]: hour, [minKey]: minute };
+  return { [hourKey]: Number.isNaN(hour) ? 0 : hour, [minKey]: Number.isNaN(minute) ? 0 : minute };
 }
 
 function readSettingsForm() {
@@ -270,6 +290,9 @@ function readSettingsForm() {
     chargepoint_ids: chargepointIds,
     brightness_pct: parseInt(document.getElementById("brightness_pct").value, 10),
     screen_timeout_s: parseInt(document.getElementById("screen_timeout_s").value, 10),
+    sleep_schedule_enabled: document.getElementById("sleep_schedule_enabled").value === "true",
+    ...parseTimeInput("sleep_start", "sleep_start_hour", "sleep_start_min"),
+    ...parseTimeInput("wake_start", "wake_start_hour", "wake_start_min"),
     show_flow_chart: document.getElementById("show_flow_chart").value === "true",
     dark_mode: document.getElementById("dark_mode").value === "true",
     dark_mode_schedule: parseInt(document.getElementById("dark_mode_schedule").value, 10),
@@ -432,6 +455,7 @@ document.getElementById("install-update-btn").addEventListener("click", installU
 document.getElementById("reset-wifi-btn").addEventListener("click", resetWifi);
 document.getElementById("set-pin-btn").addEventListener("click", setWebUiPin);
 document.getElementById("dark_mode_schedule").addEventListener("change", updateScheduleFieldsVisibility);
+document.getElementById("sleep_schedule_enabled").addEventListener("change", updateSleepScheduleFieldsVisibility);
 document.getElementById("ota_auto_check").addEventListener("change", updateOtaAutoInstallVisibility);
 document.getElementById("discover-broker-btn").addEventListener("click", discoverBroker);
 

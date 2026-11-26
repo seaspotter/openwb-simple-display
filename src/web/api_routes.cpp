@@ -165,6 +165,11 @@ void HandleGetConfig(AsyncWebServerRequest* request) {
     doc["schedule_light_start_hour"] = cfg.schedule_light_start_hour;
     doc["schedule_light_start_min"] = cfg.schedule_light_start_min;
     doc["show_flow_chart"] = cfg.show_flow_chart;
+    doc["sleep_schedule_enabled"] = cfg.sleep_schedule_enabled;
+    doc["sleep_start_hour"] = cfg.sleep_start_hour;
+    doc["sleep_start_min"] = cfg.sleep_start_min;
+    doc["wake_start_hour"] = cfg.wake_start_hour;
+    doc["wake_start_min"] = cfg.wake_start_min;
     doc["ota_auto_check"] = cfg.ota_auto_check;
     doc["ota_auto_install"] = cfg.ota_auto_install;
     doc["ota_manifest_url"] = cfg.ota_manifest_url;
@@ -207,6 +212,20 @@ bool HandlePostConfig(AsyncWebServerRequest* request, JsonVariant& json) {
         if (body["schedule_light_start_min"].is<int>())
             c.schedule_light_start_min = body["schedule_light_start_min"];
         if (body["show_flow_chart"].is<bool>()) c.show_flow_chart = body["show_flow_chart"];
+        if (body["sleep_schedule_enabled"].is<bool>()) c.sleep_schedule_enabled = body["sleep_schedule_enabled"];
+        // Clamped (unlike the pre-existing dark-mode schedule's hour/min fields above,
+        // which this project otherwise mirrors): an out-of-range value here doesn't just
+        // misdraw a clock, it feeds straight into IsDarkByTimeRange's minute-of-day
+        // arithmetic and can produce a nonsensical sleep window with no validation error
+        // ever surfaced.
+        if (body["sleep_start_hour"].is<int>())
+            c.sleep_start_hour = static_cast<uint8_t>(std::clamp<int>(body["sleep_start_hour"], 0, 23));
+        if (body["sleep_start_min"].is<int>())
+            c.sleep_start_min = static_cast<uint8_t>(std::clamp<int>(body["sleep_start_min"], 0, 59));
+        if (body["wake_start_hour"].is<int>())
+            c.wake_start_hour = static_cast<uint8_t>(std::clamp<int>(body["wake_start_hour"], 0, 23));
+        if (body["wake_start_min"].is<int>())
+            c.wake_start_min = static_cast<uint8_t>(std::clamp<int>(body["wake_start_min"], 0, 59));
         if (body["ota_auto_check"].is<bool>()) c.ota_auto_check = body["ota_auto_check"];
         if (body["ota_auto_install"].is<bool>()) c.ota_auto_install = body["ota_auto_install"];
         if (body["ota_manifest_url"].is<const char*>())

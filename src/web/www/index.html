@@ -117,6 +117,20 @@
         <input id="brightness_pct" type="number" min="10" max="100" />
         <label for="screen_timeout_s">Bildschirm-Timeout (Sekunden, 0 = nie)</label>
         <input id="screen_timeout_s" type="number" min="0" />
+        <label for="sleep_schedule_enabled">Display zeitgesteuert abschalten</label>
+        <select id="sleep_schedule_enabled">
+          <option value="false">Aus</option>
+          <option value="true">An</option>
+        </select>
+        <div id="sleep-schedule-time-fields" style="display:none">
+          <label for="sleep_start">Aus ab</label>
+          <input id="sleep_start" type="time" />
+          <label for="wake_start">Wieder an ab</label>
+          <input id="wake_start" type="time" />
+        </div>
+        <p><small>Unabhängig vom Bildschirm-Timeout oben, z.&nbsp;B. für nachts: Innerhalb
+          dieses Zeitfensters bleibt das Display dunkel, ein Tippen weckt es kurz wieder.
+          Außerhalb davon gilt weiter nur der Bildschirm-Timeout.</small></p>
         <label for="show_flow_chart">Flow-Diagramm (PV/Netz/Speicher/...)</label>
         <select id="show_flow_chart">
           <option value="true">Anzeigen</option>

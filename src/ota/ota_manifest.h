@@ -4,7 +4,7 @@
 // {
 //   "latest_version": "1.2.0",
 //   "min_supported_version": "1.0.0",
-//   "release_notes_url": "https://.../releases/1.2.0.html",
+//   "release_notes_url": "https://.../changelog/#v1-2-0",
 //   "firmware": {
 //     "url": "https://.../firmware/openwb-simple-display-1.2.0-guition_4848s040c.bin",
 //     "sha256": "<hex digest>",

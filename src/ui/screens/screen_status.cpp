@@ -350,6 +350,7 @@ void ShowStatusScreen(uint8_t chargepoint_count) {
             lv_obj_t* tile = widgets::CreatePagerTile(pager, i);
             g_chargepoint_cards.push_back(CreateChargepointCard(tile, cfg.chargepoint_ids[i]));
         }
+        widgets::CreatePageDots(screen, pager);
     }
 
     lv_screen_load(screen);

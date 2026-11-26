@@ -25,6 +25,11 @@ constexpr char kTag[] = "lvgl_port";
 constexpr uint32_t kTickIntervalMs = 5;
 constexpr uint32_t kTimeoutCheckIntervalMs = 200;
 constexpr uint32_t kScheduleCheckIntervalMs = 30000;
+// How long the backlight stays on after a touch while inside a sleep-schedule window,
+// independent of screen_timeout_s (which may be 0, "never", for daytime use — using it
+// here too would mean a sleep schedule configured alongside an inactivity timeout of
+// "never" could never actually re-darken after a touch, defeating the schedule).
+constexpr uint32_t kScheduledSleepWakeGraceMs = 15000;
 // Hardcoded on purpose, per the project's own choice — accurate enough for a day/light
 // decision anywhere in Germany, without asking the person for their exact location.
 constexpr double kMiddleGermanyLat = 51.1657;
@@ -55,20 +60,39 @@ void ApplyScreenTransition(ScreenMode* mode) {
     }
 }
 
+// True if `sleep_schedule_enabled` and the current local time falls inside
+// [sleep_start, wake_start) — reuses the dark-mode schedule's own time-range test
+// (util::IsDarkByTimeRange), since "is it within a wrapping evening-to-morning window" is
+// exactly the same calculation either way, just against different config fields.
+bool IsWithinSleepSchedule(const config::AppConfig& cfg) {
+    if (!cfg.sleep_schedule_enabled) return false;
+
+    time_t now_time = time(nullptr);
+    struct tm local_tm;
+    localtime_r(&now_time, &local_tm);
+    if (local_tm.tm_year < 120) return false; // SNTP hasn't synced yet (default epoch)
+
+    return util::IsDarkByTimeRange(local_tm.tm_hour, local_tm.tm_min, cfg.sleep_start_hour, cfg.sleep_start_min,
+                                    cfg.wake_start_hour, cfg.wake_start_min);
+}
+
+// Two independent reasons the backlight can be off, combined with OR so neither setting
+// disables the other: screen_timeout_s's plain inactivity timeout (unchanged from
+// before), and a configured sleep schedule's own, shorter wake-grace timeout while inside
+// its window. A touch always wins immediately either way — idle_ms resets to ~0 on every
+// touch (see state::NoteTouch, called from the touch driver), which is below both
+// thresholds the instant it happens.
 void ApplyScreenTimeout(bool* dimmed) {
     const config::AppConfig& cfg = config::Store().Get();
-    if (cfg.screen_timeout_s == 0) {
-        if (*dimmed) {
-            *dimmed = false;
-            board::SetBacklight(cfg.brightness_pct);
-        }
-        return;
-    }
+    uint32_t idle_ms = millis() - state::State().LastTouchMillis();
 
-    bool idle = millis() - state::State().LastTouchMillis() >= cfg.screen_timeout_s * 1000UL;
-    if (idle != *dimmed) {
-        *dimmed = idle;
-        board::SetBacklight(idle ? 0 : cfg.brightness_pct);
+    bool idle_timeout = cfg.screen_timeout_s != 0 && idle_ms >= cfg.screen_timeout_s * 1000UL;
+    bool scheduled_sleep = IsWithinSleepSchedule(cfg) && idle_ms >= kScheduledSleepWakeGraceMs;
+    bool should_be_dimmed = idle_timeout || scheduled_sleep;
+
+    if (should_be_dimmed != *dimmed) {
+        *dimmed = should_be_dimmed;
+        board::SetBacklight(should_be_dimmed ? 0 : cfg.brightness_pct);
     }
 }
 
