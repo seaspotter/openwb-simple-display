@@ -67,6 +67,13 @@ void ApplyScreenTransition(ScreenMode* mode) {
 bool IsWithinSleepSchedule(const config::AppConfig& cfg) {
     if (!cfg.sleep_schedule_enabled) return false;
 
+    // Equal start/end would otherwise mean "always dark" (see IsDarkByTimeRange) — fine
+    // for the dark-mode schedule (just a theme), but for this one "dark" means the
+    // backlight is off, and equal fields are exactly what app.js's parseTimeInput silently
+    // saves if both time inputs get cleared. Treat that as an unset/degenerate schedule
+    // instead of "always asleep", so a stray empty-field save can't brick the display.
+    if (cfg.sleep_start_hour == cfg.wake_start_hour && cfg.sleep_start_min == cfg.wake_start_min) return false;
+
     time_t now_time = time(nullptr);
     struct tm local_tm;
     localtime_r(&now_time, &local_tm);
@@ -82,12 +89,18 @@ bool IsWithinSleepSchedule(const config::AppConfig& cfg) {
 // its window. A touch always wins immediately either way — idle_ms resets to ~0 on every
 // touch (see state::NoteTouch, called from the touch driver), which is below both
 // thresholds the instant it happens.
-void ApplyScreenTimeout(bool* dimmed) {
+//
+// `in_sleep_window` is passed in rather than recomputed here: this runs every
+// kTimeoutCheckIntervalMs (200ms) for responsive touch-driven dimming, but the sleep
+// window only ever changes once a minute, so the caller refreshes it on the same
+// kScheduleCheckIntervalMs (30s) cadence already used for the dark-mode schedule instead
+// of doing a clock read+localtime_r 5x/second for no benefit.
+void ApplyScreenTimeout(bool* dimmed, bool in_sleep_window) {
     const config::AppConfig& cfg = config::Store().Get();
     uint32_t idle_ms = millis() - state::State().LastTouchMillis();
 
     bool idle_timeout = cfg.screen_timeout_s != 0 && idle_ms >= cfg.screen_timeout_s * 1000UL;
-    bool scheduled_sleep = IsWithinSleepSchedule(cfg) && idle_ms >= kScheduledSleepWakeGraceMs;
+    bool scheduled_sleep = in_sleep_window && idle_ms >= kScheduledSleepWakeGraceMs;
     bool should_be_dimmed = idle_timeout || scheduled_sleep;
 
     if (should_be_dimmed != *dimmed) {
@@ -140,6 +153,7 @@ void LvglTask(void* /*param*/) {
     uint32_t last_timeout_check = last_tick;
     uint32_t last_schedule_check = last_tick;
     bool dimmed = false;
+    bool in_sleep_window = false;
     ScreenMode screen_mode = ScreenMode::kBoot;
     for (;;) {
         uint32_t now = millis();
@@ -149,12 +163,13 @@ void LvglTask(void* /*param*/) {
 
         if (now - last_timeout_check >= kTimeoutCheckIntervalMs) {
             last_timeout_check = now;
-            ApplyScreenTimeout(&dimmed);
+            ApplyScreenTimeout(&dimmed, in_sleep_window);
             ApplyScreenTransition(&screen_mode);
         }
 
         if (now - last_schedule_check >= kScheduleCheckIntervalMs) {
             last_schedule_check = now;
+            in_sleep_window = IsWithinSleepSchedule(config::Store().Get());
             ApplyDarkModeSchedule(screen_mode);
         }
 
