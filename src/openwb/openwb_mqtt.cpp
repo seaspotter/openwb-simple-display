@@ -115,15 +115,28 @@ void SubscribeExtraComponent(const char* component, const char* flag_field, uint
 void SubscribeExtraCounter(uint8_t id) { SubscribeExtraComponent("counter", "is_home_consumption_counter", id); }
 void SubscribeExtraConsumer(uint8_t id) { SubscribeExtraComponent("consumer", "is_home_consumption_consumer", id); }
 
+// Scans `items[0..*count)` for an existing `id`; if it's new and there's room, appends a
+// default-constructed slot with that `id` set, increments `*count`, and returns true. Bails
+// out (false) if `id` is already known or the array is full. This is the one "find-or-add,
+// bounded" shape behind every Ensure*Discovered function below (extra counters, extra
+// consumers, chargepoints) — each only differs in what runs once something new is actually
+// added, which stays in the caller rather than being copy-pasted here three times.
+template <typename T, uint8_t N>
+bool FindOrAdd(T (&items)[N], uint8_t* count, uint8_t id) {
+    for (uint8_t i = 0; i < *count; ++i) {
+        if (items[i].id == id) return false;
+    }
+    if (*count >= N) return false;
+    items[*count] = T{};
+    items[*count].id = id;
+    ++*count;
+    return true;
+}
+
 // Adds `id` to the discovered set and subscribes to its power + home-consumption-flag
 // topics, unless already known.
 void EnsureExtraCounterDiscovered(uint8_t id) {
-    for (uint8_t i = 0; i < g_extra_counter_count; ++i) {
-        if (g_extra_counters[i].id == id) return;
-    }
-    if (g_extra_counter_count >= kMaxExtraCounters) return;
-    g_extra_counters[g_extra_counter_count] = ExtraComponent{id, 0, HcFlag::kAuto};
-    ++g_extra_counter_count;
+    if (!FindOrAdd(g_extra_counters, &g_extra_counter_count, id)) return;
     SubscribeExtraCounter(id);
     util::LogInfo(kTag, "discovered an extra counter via the hierarchy topic");
 }
@@ -131,12 +144,7 @@ void EnsureExtraCounterDiscovered(uint8_t id) {
 // Adds `id` to the discovered set and subscribes to its power + home-consumption-flag
 // topics, unless already known.
 void EnsureExtraConsumerDiscovered(uint8_t id) {
-    for (uint8_t i = 0; i < g_extra_consumer_count; ++i) {
-        if (g_extra_consumers[i].id == id) return;
-    }
-    if (g_extra_consumer_count >= kMaxExtraConsumers) return;
-    g_extra_consumers[g_extra_consumer_count] = ExtraComponent{id, 0, HcFlag::kAuto};
-    ++g_extra_consumer_count;
+    if (!FindOrAdd(g_extra_consumers, &g_extra_consumer_count, id)) return;
     SubscribeExtraConsumer(id);
     util::LogInfo(kTag, "discovered an extra consumer via the hierarchy topic");
 }
@@ -156,13 +164,7 @@ void SubscribeChargepointName(uint8_t id) {
 // config/name — subscribing again here is a harmless duplicate. For a discovered-but-
 // not-configured one, this is the only topic fetched for it, keeping discovery cheap.
 void EnsureChargepointDiscovered(uint8_t id) {
-    for (uint8_t i = 0; i < g_discovered_chargepoint_count; ++i) {
-        if (g_discovered_chargepoints[i].id == id) return;
-    }
-    if (g_discovered_chargepoint_count >= kMaxDiscoveredChargepoints) return;
-    g_discovered_chargepoints[g_discovered_chargepoint_count].id = id;
-    g_discovered_chargepoints[g_discovered_chargepoint_count].name[0] = '\0';
-    ++g_discovered_chargepoint_count;
+    if (!FindOrAdd(g_discovered_chargepoints, &g_discovered_chargepoint_count, id)) return;
     SubscribeChargepointName(id);
     PublishDiscoveredChargepoints();
     util::LogInfo(kTag, "discovered a chargepoint via the hierarchy topic");
