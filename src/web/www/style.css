@@ -184,6 +184,18 @@ label {
     color: var(--muted);
 }
 
+/* Puts two related fields (e.g. a time range's start/end) side by side instead of each
+   taking a full-width row — used for the dark-mode and sleep schedules' time pickers. */
+.field-row {
+    display: flex;
+    gap: 12px;
+}
+
+.field-row > div {
+    flex: 1;
+    min-width: 0;
+}
+
 input, select {
     width: 100%;
     padding: 8px 10px;

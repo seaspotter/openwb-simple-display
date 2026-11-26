@@ -82,18 +82,20 @@ function toTimeInput(hour, minute) {
 
 // Shows targetId exactly when selectId's current value equals showValue (as a string,
 // since <select> values are always strings) — the shared shape behind every "pick a
-// mode, reveal the fields that mode needs" toggle on this page.
-function toggleFieldVisibility(selectId, targetId, showValue) {
+// mode, reveal the fields that mode needs" toggle on this page. `displayValue` is the
+// CSS display mode to show it with — "flex" for the two-up .field-row time pickers,
+// "block" (the default) for a plain single-column div.
+function toggleFieldVisibility(selectId, targetId, showValue, displayValue = "block") {
   const shown = document.getElementById(selectId).value === showValue;
-  document.getElementById(targetId).style.display = shown ? "block" : "none";
+  document.getElementById(targetId).style.display = shown ? displayValue : "none";
 }
 
 function updateScheduleFieldsVisibility() {
-  toggleFieldVisibility("dark_mode_schedule", "schedule-time-fields", "1");
+  toggleFieldVisibility("dark_mode_schedule", "schedule-time-fields", "1", "flex");
 }
 
 function updateSleepScheduleFieldsVisibility() {
-  toggleFieldVisibility("sleep_schedule_enabled", "sleep-schedule-time-fields", "true");
+  toggleFieldVisibility("sleep_schedule_enabled", "sleep-schedule-time-fields", "true", "flex");
 }
 
 function updateOtaAutoInstallVisibility() {
